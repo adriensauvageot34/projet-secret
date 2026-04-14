@@ -90,7 +90,27 @@ export interface Level {
   created_at: string;
   updated_at: string;
 }
-export interface ElementTemplate { id: string; element_type: ElementType; code: string; title: string; difficulty: number; validation_mode: ValidationMode; can_be_fake: boolean; in_reserve_pool: boolean; player_display_text: string; success_button_label: string; failure_button_label: string; }
+export interface ElementTemplate {
+  id: string;
+  code: string;
+  name: string;
+  element_type: ElementType;
+  category: string;
+  difficulty: number;
+  points: number;
+  duration_minutes: number;
+  skip_unlock_minutes: number;
+  validation_mode: ValidationMode;
+  proof_required: boolean;
+  can_be_fake: boolean;
+  can_appear_in_reserve: boolean;
+  is_active: boolean;
+  player_description: string;
+  short_label: string;
+  ui_tags: string[];
+  created_at: string;
+  updated_at: string;
+}
 export interface ElementInstance { id: string; session_id: string; participant_id: string; template_id: string; slot_index: number; state: ElementInstanceState; claimed_result: ClaimedResult; final_result: FinalResult; proof_status: ProofStatus; activated_at?: string | null; skip_available_at?: string | null; ends_at?: string | null; cooldown_until?: string | null; points_gained: number; points_lost: number; tokens_gained: number; created_at: string; updated_at: string; }
 export interface AdvantageTemplate { id: string; code: string; title: string; description: string; effect_code: string; price_tokens: number; tier: number; }
 export interface AdvantageInstance { id: string; session_id: string; owner_participant_id: string; target_participant_id: string | null; template_id: string; source: AdvantageSource; state: AdvantageInstanceState; remaining_uses: number; activated_at?: string | null; expires_at?: string | null; created_at: string; }

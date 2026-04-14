@@ -143,21 +143,44 @@ on delete set null;
 create table element_templates (
   id uuid primary key default gen_random_uuid(),
   code text unique not null,
+  name text not null,
   element_type text not null,
-  title text not null,
-  player_display_text text not null,
-  difficulty int not null,
-  validation_mode text not null default 'self_declare',
-  skip_unlock_rule text not null default 'after_delay',
+  category text not null,
+  difficulty integer not null,
+  points integer not null default 0,
+  duration_minutes integer not null,
+  skip_unlock_minutes integer not null,
+  validation_mode text not null,
+  proof_required boolean not null default false,
   can_be_fake boolean not null default false,
-  in_reserve_pool boolean not null default true,
-  success_button_label text not null default 'Réussi',
-  failure_button_label text not null default 'Échoué',
-  ui_tag_1 text,
-  ui_tag_2 text,
-  config jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default timezone('utc', now())
+  can_appear_in_reserve boolean not null default true,
+  is_active boolean not null default true,
+  player_description text not null,
+  short_label text not null default '',
+  ui_tags text[] default '{}'::text[],
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint element_templates_type_check check (element_type in ('mission', 'constraint')),
+  constraint element_templates_validation_mode_check check (validation_mode in ('auto', 'proof', 'gm')),
+  constraint element_templates_validation_consistency_check check (
+    (validation_mode = 'auto' and proof_required = false)
+    or
+    (validation_mode = 'proof' and proof_required = true)
+    or
+    (validation_mode = 'gm')
+  ),
+  constraint element_templates_values_check check (
+    difficulty >= 1
+    and points >= 0
+    and duration_minutes > 0
+    and skip_unlock_minutes >= 0
+  )
 );
+
+create trigger trg_element_templates_set_updated_at
+before update on element_templates
+for each row
+execute function set_updated_at();
 
 create table element_instances (
   id uuid primary key default gen_random_uuid(),
@@ -279,8 +302,16 @@ create table wheel_outcome_templates (
 create table final_wheel_spins (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references sessions(id) on delete cascade,
-  participant_id uuid not null references participants(id) on delete cascade,
+  participant_id uuid not null references participants(id),
   outcome_template_id uuid not null references wheel_outcome_templates(id),
   spun_at timestamptz not null default timezone('utc', now()),
   notes text
 );
+
+create index idx_participants_session_id on participants(session_id);
+create index idx_element_instances_session_participant on element_instances(session_id, participant_id);
+create index idx_advantage_instances_session_participant on advantage_instances(session_id, participant_id);
+create index idx_score_events_session_participant on score_events(session_id, participant_id);
+create index idx_token_events_session_participant on token_events(session_id, participant_id);
+create index idx_accusations_session_status on accusations(session_id, status);
+create index idx_element_templates_type_difficulty on element_templates(element_type, difficulty);
