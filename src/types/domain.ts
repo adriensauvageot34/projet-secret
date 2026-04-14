@@ -34,7 +34,23 @@ export interface Player {
   updated_at: string;
 }
 export interface Participant { id: string; session_id: string; player_id: string; role: ParticipantRole; current_status: ParticipantStatus; current_score: number; current_tokens: number; current_level: number; combo_count: number; mission_slots: number; constraint_slots: number; created_at: string; updated_at: string; }
-export interface Level { id: number; rank_name: string; min_score: number; mission_difficulty_max: number; constraint_difficulty_max: number; shop_tier_max: number; fake_elements_unlocked: boolean; missions_visible_per_difficulty: number; constraints_visible_per_difficulty: number; }
+export interface Level {
+  id: string;
+  level_number: number;
+  label: string;
+  min_score: number;
+  max_score: number;
+  mission_difficulty_max: number;
+  constraint_difficulty_max: number;
+  shop_tier_max: number;
+  fake_elements_unlocked: boolean;
+  missions_visible_per_difficulty: number;
+  constraints_visible_per_difficulty: number;
+  privilege_text: string;
+  visible_order: number;
+  created_at: string;
+  updated_at: string;
+}
 export interface ElementTemplate { id: string; element_type: ElementType; code: string; title: string; difficulty: number; validation_mode: ValidationMode; can_be_fake: boolean; in_reserve_pool: boolean; player_display_text: string; success_button_label: string; failure_button_label: string; }
 export interface ElementInstance { id: string; session_id: string; participant_id: string; template_id: string; slot_index: number; state: ElementInstanceState; claimed_result: ClaimedResult; final_result: FinalResult; proof_status: ProofStatus; activated_at?: string | null; skip_available_at?: string | null; ends_at?: string | null; cooldown_until?: string | null; points_gained: number; points_lost: number; tokens_gained: number; created_at: string; updated_at: string; }
 export interface AdvantageTemplate { id: string; code: string; title: string; description: string; effect_code: string; price_tokens: number; tier: number; }

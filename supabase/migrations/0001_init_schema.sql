@@ -45,16 +45,38 @@ execute function set_updated_at();
 alter table sessions add constraint sessions_gm_player_id_fkey foreign key (gm_player_id) references players(id);
 
 create table levels (
-  id int primary key,
-  rank_name text not null,
+  id uuid primary key default gen_random_uuid(),
+  level_number int not null unique,
+  label text not null,
   min_score int not null,
+  max_score int not null,
   mission_difficulty_max int not null,
   constraint_difficulty_max int not null,
   shop_tier_max int not null,
   fake_elements_unlocked boolean not null default false,
-  missions_visible_per_difficulty int not null default 1,
-  constraints_visible_per_difficulty int not null default 1
+  missions_visible_per_difficulty int not null,
+  constraints_visible_per_difficulty int not null,
+  privilege_text text not null default '',
+  visible_order int not null unique,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint levels_score_range_check check (min_score <= max_score),
+  constraint levels_non_negative_values_check check (
+    min_score >= 0
+    and max_score >= 0
+    and mission_difficulty_max >= 1
+    and constraint_difficulty_max >= 1
+    and shop_tier_max >= 1
+    and missions_visible_per_difficulty >= 1
+    and constraints_visible_per_difficulty >= 1
+    and visible_order >= 1
+  )
 );
+
+create trigger trg_levels_set_updated_at
+before update on levels
+for each row
+execute function set_updated_at();
 
 create table participants (
   id uuid primary key default gen_random_uuid(),
@@ -64,7 +86,7 @@ create table participants (
   current_status text not null default 'active',
   current_score int not null default 0,
   current_tokens int not null default 0,
-  current_level int not null default 1 references levels(id),
+  current_level int not null default 1 references levels(level_number),
   combo_count int not null default 0,
   mission_slots int not null default 2,
   constraint_slots int not null default 1,
