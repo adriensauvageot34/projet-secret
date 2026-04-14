@@ -1,6 +1,6 @@
 export type SessionStatus = "preparation" | "live" | "finished" | "archived";
-export type ParticipantRole = "player" | "gm" | "observer";
-export type ParticipantStatus = "active" | "eliminated" | "offline";
+export type ParticipantRole = "player" | "gm";
+export type ParticipantStatus = "ready" | "active" | "waiting" | "investigating" | "finished" | "gm";
 export type ElementType = "mission" | "constraint";
 export type ElementInstanceState = "reserve" | "active" | "claimed" | "resolved" | "expired" | "cancelled";
 export type ClaimedResult = "success" | "failure" | "skip" | "none";
