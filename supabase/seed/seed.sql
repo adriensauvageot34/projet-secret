@@ -136,3 +136,62 @@ set
   can_play = excluded.can_play,
   can_be_gm = excluded.can_be_gm,
   role_tag = excluded.role_tag;
+
+-- TODO: rattacher session_gm_participant_id au participant GM "Adrien" une fois les participants sessionnels seedés.
+insert into sessions (
+  name,
+  session_date,
+  location,
+  status,
+  rules_announced_at,
+  game_start_at,
+  game_end_at,
+  max_active_missions,
+  max_active_constraints,
+  reserve_per_difficulty,
+  fake_unlock_level,
+  fake_cycle_every_n_completed,
+  bottom_count_for_wheel,
+  game_mode,
+  notes,
+  gm_session_notes,
+  session_gm_participant_id
+)
+values (
+  'Jeu des ombres — Anniversaire surprise Manon 27 ans',
+  '2026-04-18',
+  'Maison de la grand-mère de Manon — préau',
+  'preparation',
+  timestamptz '2026-04-18 20:30:00 Europe/Paris',
+  timestamptz '2026-04-18 21:00:00 Europe/Paris',
+  timestamptz '2026-04-18 23:30:00 Europe/Paris',
+  2,
+  2,
+  2,
+  3,
+  5,
+  5,
+  'standard',
+  '',
+  '',
+  null
+)
+on conflict (name) do update
+set
+  session_date = excluded.session_date,
+  location = excluded.location,
+  status = excluded.status,
+  rules_announced_at = excluded.rules_announced_at,
+  game_start_at = excluded.game_start_at,
+  game_end_at = excluded.game_end_at,
+  max_active_missions = excluded.max_active_missions,
+  max_active_constraints = excluded.max_active_constraints,
+  reserve_per_difficulty = excluded.reserve_per_difficulty,
+  fake_unlock_level = excluded.fake_unlock_level,
+  fake_cycle_every_n_completed = excluded.fake_cycle_every_n_completed,
+  bottom_count_for_wheel = excluded.bottom_count_for_wheel,
+  game_mode = excluded.game_mode,
+  notes = excluded.notes,
+  gm_session_notes = excluded.gm_session_notes,
+  session_gm_participant_id = excluded.session_gm_participant_id,
+  updated_at = timezone('utc', now());

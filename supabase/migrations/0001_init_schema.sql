@@ -2,17 +2,34 @@ create extension if not exists "pgcrypto";
 
 create table sessions (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  name text not null unique,
   session_date date not null,
-  location text,
-  status text not null default 'draft',
-  starts_at timestamptz,
-  ends_at timestamptz,
-  settings jsonb not null default '{}'::jsonb,
-  gm_player_id uuid,
-  notes text,
+  location text not null,
+  status text not null,
+  rules_announced_at timestamptz not null,
+  game_start_at timestamptz not null,
+  game_end_at timestamptz not null,
+  max_active_missions integer not null default 2,
+  max_active_constraints integer not null default 2,
+  reserve_per_difficulty integer not null default 2,
+  fake_unlock_level integer not null default 3,
+  fake_cycle_every_n_completed integer not null default 5,
+  bottom_count_for_wheel integer not null default 5,
+  game_mode text not null default 'standard',
+  notes text not null default '',
+  gm_session_notes text not null default '',
+  session_gm_participant_id uuid,
   created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint sessions_status_check check (status in ('preparation', 'live', 'finished', 'archived')),
+  constraint sessions_game_mode_check check (game_mode in ('standard')),
+  constraint sessions_max_active_missions_non_negative check (max_active_missions >= 0),
+  constraint sessions_max_active_constraints_non_negative check (max_active_constraints >= 0),
+  constraint sessions_reserve_per_difficulty_non_negative check (reserve_per_difficulty >= 0),
+  constraint sessions_fake_unlock_level_min check (fake_unlock_level >= 1),
+  constraint sessions_fake_cycle_every_n_completed_min check (fake_cycle_every_n_completed >= 1),
+  constraint sessions_bottom_count_for_wheel_non_negative check (bottom_count_for_wheel >= 0),
+  constraint sessions_schedule_order_check check (rules_announced_at <= game_start_at and game_start_at <= game_end_at)
 );
 
 create table players (
@@ -42,7 +59,6 @@ before update on players
 for each row
 execute function set_updated_at();
 
-alter table sessions add constraint sessions_gm_player_id_fkey foreign key (gm_player_id) references players(id);
 
 create table levels (
   id uuid primary key default gen_random_uuid(),
@@ -94,6 +110,17 @@ create table participants (
   updated_at timestamptz not null default timezone('utc', now()),
   unique (session_id, player_id)
 );
+
+create trigger trg_sessions_set_updated_at
+before update on sessions
+for each row
+execute function set_updated_at();
+
+alter table sessions
+add constraint sessions_session_gm_participant_id_fkey
+foreign key (session_gm_participant_id)
+references participants(id)
+on delete set null;
 
 create table element_templates (
   id uuid primary key default gen_random_uuid(),
