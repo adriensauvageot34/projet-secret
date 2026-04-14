@@ -1,4 +1,4 @@
-export type SessionStatus = "draft" | "scheduled" | "running" | "paused" | "closed";
+export type SessionStatus = "preparation" | "live" | "finished" | "archived";
 export type ParticipantRole = "player" | "gm" | "observer";
 export type ParticipantStatus = "active" | "eliminated" | "offline";
 export type ElementType = "mission" | "constraint";

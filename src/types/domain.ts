@@ -19,7 +19,28 @@ import type {
   ValidationMode,
 } from "@/lib/game/enums";
 
-export interface Session { id: string; name: string; status: SessionStatus; date: string; location?: string | null; gm_player_id?: string | null; starts_at?: string | null; ends_at?: string | null; notes?: string | null; created_at: string; updated_at: string; }
+export interface Session {
+  id: string;
+  name: string;
+  session_date: string;
+  location: string;
+  status: SessionStatus;
+  rules_announced_at: string;
+  game_start_at: string;
+  game_end_at: string;
+  max_active_missions: number;
+  max_active_constraints: number;
+  reserve_per_difficulty: number;
+  fake_unlock_level: number;
+  fake_cycle_every_n_completed: number;
+  bottom_count_for_wheel: number;
+  game_mode: string;
+  notes: string;
+  gm_session_notes: string;
+  session_gm_participant_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
 export interface Player {
   id: string;
   display_name: string;
