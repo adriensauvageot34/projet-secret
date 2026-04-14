@@ -20,7 +20,19 @@ import type {
 } from "@/lib/game/enums";
 
 export interface Session { id: string; name: string; status: SessionStatus; date: string; location?: string | null; gm_player_id?: string | null; starts_at?: string | null; ends_at?: string | null; notes?: string | null; created_at: string; updated_at: string; }
-export interface Player { id: string; display_name: string; handle?: string | null; created_at: string; }
+export interface Player {
+  id: string;
+  display_name: string;
+  nickname: string | null;
+  photo_url: string | null;
+  notes_profile: string | null;
+  is_active: boolean;
+  can_play: boolean;
+  can_be_gm: boolean;
+  role_tag: string | null;
+  created_at: string;
+  updated_at: string;
+}
 export interface Participant { id: string; session_id: string; player_id: string; role: ParticipantRole; current_status: ParticipantStatus; current_score: number; current_tokens: number; current_level: number; combo_count: number; mission_slots: number; constraint_slots: number; created_at: string; updated_at: string; }
 export interface Level { id: number; rank_name: string; min_score: number; mission_difficulty_max: number; constraint_difficulty_max: number; shop_tier_max: number; fake_elements_unlocked: boolean; missions_visible_per_difficulty: number; constraints_visible_per_difficulty: number; }
 export interface ElementTemplate { id: string; element_type: ElementType; code: string; title: string; difficulty: number; validation_mode: ValidationMode; can_be_fake: boolean; in_reserve_pool: boolean; player_display_text: string; success_button_label: string; failure_button_label: string; }

@@ -17,10 +17,30 @@ create table sessions (
 
 create table players (
   id uuid primary key default gen_random_uuid(),
-  display_name text not null,
-  handle text,
-  created_at timestamptz not null default timezone('utc', now())
+  display_name text not null unique,
+  nickname text,
+  photo_url text,
+  notes_profile text,
+  is_active boolean not null default true,
+  can_play boolean not null default true,
+  can_be_gm boolean not null default false,
+  role_tag text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_players_set_updated_at
+before update on players
+for each row
+execute function set_updated_at();
 
 alter table sessions add constraint sessions_gm_player_id_fkey foreign key (gm_player_id) references players(id);
 
