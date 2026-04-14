@@ -98,21 +98,39 @@ create table participants (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references sessions(id) on delete cascade,
   player_id uuid not null references players(id),
-  role text not null default 'player',
-  current_status text not null default 'active',
+  current_level_id uuid references levels(id),
+  display_name text not null default '',
+  role text not null,
+  current_status text not null,
   current_score int not null default 0,
   current_tokens int not null default 0,
-  current_level int not null default 1 references levels(level_number),
-  combo_count int not null default 0,
-  mission_slots int not null default 2,
-  constraint_slots int not null default 1,
+  combo_streak_current int not null default 0,
+  mission_slot_max int not null default 2,
+  constraint_slot_max int not null default 2,
+  completed_elements_count int not null default 0,
+  waiting_slot_count int not null default 0,
+  blocked_slot_count int not null default 0,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
+  constraint participants_role_check check (role in ('player', 'gm')),
+  constraint participants_current_status_check check (
+    current_status in ('ready', 'active', 'waiting', 'investigating', 'finished', 'gm')
+  ),
+  constraint participants_mission_slot_max_non_negative check (mission_slot_max >= 0),
+  constraint participants_constraint_slot_max_non_negative check (constraint_slot_max >= 0),
+  constraint participants_combo_streak_current_non_negative check (combo_streak_current >= 0),
+  constraint participants_current_score_non_negative check (current_score >= 0),
+  constraint participants_current_tokens_non_negative check (current_tokens >= 0),
   unique (session_id, player_id)
 );
 
 create trigger trg_sessions_set_updated_at
 before update on sessions
+for each row
+execute function set_updated_at();
+
+create trigger trg_participants_set_updated_at
+before update on participants
 for each row
 execute function set_updated_at();
 
@@ -178,7 +196,8 @@ create table advantage_templates (
 create table advantage_instances (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references sessions(id) on delete cascade,
-  participant_id uuid not null references participants(id) on delete cascade,
+  owner_participant_id uuid not null references participants(id) on delete cascade,
+  target_participant_id uuid references participants(id) on delete set null,
   template_id uuid not null references advantage_templates(id),
   source text not null default 'shop',
   state text not null default 'owned',
@@ -193,7 +212,7 @@ create table accusations (
   session_id uuid not null references sessions(id) on delete cascade,
   accuser_participant_id uuid not null references participants(id),
   accused_participant_id uuid not null references participants(id),
-  arbiter_participant_id uuid references participants(id),
+  adjudicated_by_participant_id uuid references participants(id),
   suspect_element_type text,
   suspect_template_id uuid references element_templates(id),
   linked_element_instance_id uuid references element_instances(id),
@@ -212,7 +231,9 @@ create table gm_decisions (
   session_id uuid not null references sessions(id) on delete cascade,
   decision_type text not null,
   status text not null default 'recorded',
-  actor_participant_id uuid references participants(id),
+  made_by_participant_id uuid references participants(id),
+  target_participant_id uuid references participants(id),
+  other_target_participant_id uuid references participants(id),
   accusation_id uuid references accusations(id),
   element_instance_id uuid references element_instances(id),
   rationale text,
