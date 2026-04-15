@@ -184,24 +184,43 @@ execute function set_updated_at();
 
 create table element_instances (
   id uuid primary key default gen_random_uuid(),
-  session_id uuid not null references sessions(id) on delete cascade,
   participant_id uuid not null references participants(id) on delete cascade,
-  template_id uuid not null references element_templates(id),
-  slot_index int not null default 0,
-  state text not null default 'reserve',
-  claimed_result text not null default 'none',
-  final_result text not null default 'pending',
+  session_id uuid not null references sessions(id) on delete cascade,
+  element_template_id uuid not null references element_templates(id),
+  state text not null,
+  active_slot_index integer,
+  is_fake boolean not null default false,
+  claimed_result text,
+  final_result text,
   proof_status text not null default 'not_required',
   activated_at timestamptz,
   skip_available_at timestamptz,
   ends_at timestamptz,
   cooldown_until timestamptz,
-  points_gained int not null default 0,
-  points_lost int not null default 0,
-  tokens_gained int not null default 0,
+  points_gained integer not null default 0,
+  points_lost integer not null default 0,
+  tokens_gained integer not null default 0,
+  was_retroactively_invalidated boolean not null default false,
   created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint element_instances_state_check check (
+    state in ('active','cooldown','completed','failed','broken','skipped','expired','cancelled','bait_triggered','gm_voided')
+  ),
+  constraint element_instances_claimed_result_check check (
+    claimed_result is null or claimed_result in ('success','fail','broken','skipped')
+  ),
+  constraint element_instances_final_result_check check (
+    final_result is null or final_result in ('success','fail','broken','skipped','cancelled','bait_triggered','gm_voided')
+  ),
+  constraint element_instances_proof_status_check check (
+    proof_status in ('not_required','pending','provided','denied')
+  )
 );
+
+create trigger trg_element_instances_set_updated_at
+before update on element_instances
+for each row
+execute function set_updated_at();
 
 create table advantage_templates (
   id uuid primary key default gen_random_uuid(),
@@ -310,7 +329,7 @@ create table final_wheel_spins (
 
 create index idx_participants_session_id on participants(session_id);
 create index idx_element_instances_session_participant on element_instances(session_id, participant_id);
-create index idx_advantage_instances_session_participant on advantage_instances(session_id, participant_id);
+create index idx_advantage_instances_session_participant on advantage_instances(session_id, owner_participant_id);
 create index idx_score_events_session_participant on score_events(session_id, participant_id);
 create index idx_token_events_session_participant on token_events(session_id, participant_id);
 create index idx_accusations_session_status on accusations(session_id, status);

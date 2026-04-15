@@ -111,7 +111,28 @@ export interface ElementTemplate {
   created_at: string;
   updated_at: string;
 }
-export interface ElementInstance { id: string; session_id: string; participant_id: string; template_id: string; slot_index: number; state: ElementInstanceState; claimed_result: ClaimedResult; final_result: FinalResult; proof_status: ProofStatus; activated_at?: string | null; skip_available_at?: string | null; ends_at?: string | null; cooldown_until?: string | null; points_gained: number; points_lost: number; tokens_gained: number; created_at: string; updated_at: string; }
+export interface ElementInstance {
+  id: string;
+  participant_id: string;
+  session_id: string;
+  element_template_id: string;
+  state: ElementInstanceState;
+  active_slot_index?: number | null;
+  is_fake: boolean;
+  claimed_result?: ClaimedResult | null;
+  final_result?: FinalResult | null;
+  proof_status: ProofStatus;
+  activated_at?: string | null;
+  skip_available_at?: string | null;
+  ends_at?: string | null;
+  cooldown_until?: string | null;
+  points_gained: number;
+  points_lost: number;
+  tokens_gained: number;
+  was_retroactively_invalidated: boolean;
+  created_at: string;
+  updated_at: string;
+}
 export interface AdvantageTemplate { id: string; code: string; title: string; description: string; effect_code: string; price_tokens: number; tier: number; }
 export interface AdvantageInstance { id: string; session_id: string; owner_participant_id: string; target_participant_id: string | null; template_id: string; source: AdvantageSource; state: AdvantageInstanceState; remaining_uses: number; activated_at?: string | null; expires_at?: string | null; created_at: string; }
 export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }

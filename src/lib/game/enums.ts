@@ -2,16 +2,47 @@ export type SessionStatus = "preparation" | "live" | "finished" | "archived";
 export type ParticipantRole = "player" | "gm";
 export type ParticipantStatus = "ready" | "active" | "waiting" | "investigating" | "finished" | "gm";
 export type ElementType = "mission" | "constraint";
-export type ElementInstanceState = "reserve" | "active" | "claimed" | "resolved" | "expired" | "cancelled";
-export type ClaimedResult = "success" | "failure" | "skip" | "none";
-export type FinalResult = "success" | "failure" | "skipped" | "void" | "pending";
-export type ProofStatus = "not_required" | "pending" | "submitted" | "validated" | "rejected";
+
+export type ElementInstanceState =
+  | "active"
+  | "cooldown"
+  | "completed"
+  | "failed"
+  | "broken"
+  | "skipped"
+  | "expired"
+  | "cancelled"
+  | "bait_triggered"
+  | "gm_voided";
+
+export type ClaimedResult = "success" | "fail" | "broken" | "skipped";
+
+export type FinalResult =
+  | "success"
+  | "fail"
+  | "broken"
+  | "skipped"
+  | "cancelled"
+  | "bait_triggered"
+  | "gm_voided";
+
+export type ProofStatus = "not_required" | "pending" | "provided" | "denied";
 export type AccusationStatus = "draft" | "submitted" | "under_review" | "resolved" | "cancelled";
 export type AccusationDecision = "pending" | "accepted" | "rejected";
 export type AccusationVerdict = "correct" | "incorrect" | "inconclusive" | "none";
 export type GmDecisionType = "accusation_adjudication" | "element_validation" | "manual_adjustment";
 export type GmDecisionStatus = "draft" | "recorded" | "applied" | "void";
-export type ScoreEventType = "element_success" | "element_failure" | "accusation" | "gm_adjustment";
+export type ScoreEventType =
+  | "element_success"
+  | "element_failure"
+  | "mission_success"
+  | "mission_fail"
+  | "mission_broken"
+  | "constraint_success"
+  | "constraint_fail"
+  | "constraint_broken"
+  | "accusation"
+  | "gm_adjustment";
 export type TokenEventType = "reward" | "purchase" | "penalty" | "gm_adjustment";
 export type AdvantageSource = "shop" | "gm_grant" | "session_bonus";
 export type AdvantageInstanceState = "owned" | "active" | "consumed" | "expired" | "cancelled";
