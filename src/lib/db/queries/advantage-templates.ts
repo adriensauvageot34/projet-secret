@@ -1,1 +1,91 @@
-export async function todoDb(){ throw new Error("TODO: implement db call"); }
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { AdvantageTemplate } from "@/types/domain";
+
+function applyDefaultTemplateOrdering<TQuery extends { order: (column: string, options: { ascending: boolean }) => TQuery }>(query: TQuery): TQuery {
+  return query.order("tier", { ascending: true }).order("cost_tokens", { ascending: true }).order("name", { ascending: true });
+}
+
+export async function getAllAdvantageTemplates(): Promise<AdvantageTemplate[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await applyDefaultTemplateOrdering(supabase.from("advantage_templates").select("*"));
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AdvantageTemplate[];
+}
+
+export async function getActiveAdvantageTemplates(): Promise<AdvantageTemplate[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await applyDefaultTemplateOrdering(supabase.from("advantage_templates").select("*").eq("is_active", true));
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AdvantageTemplate[];
+}
+
+export async function getAdvantageTemplateById(id: string): Promise<AdvantageTemplate | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("advantage_templates").select("*").eq("id", id).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? null) as AdvantageTemplate | null;
+}
+
+export async function getAdvantageTemplateByEffectCode(effectCode: string): Promise<AdvantageTemplate | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("advantage_templates").select("*").eq("effect_code", effectCode).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? null) as AdvantageTemplate | null;
+}
+
+export async function getAdvantageTemplatesByTier(tier: number): Promise<AdvantageTemplate[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await applyDefaultTemplateOrdering(supabase.from("advantage_templates").select("*").eq("tier", tier));
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AdvantageTemplate[];
+}
+
+export async function getVisibleShopTemplatesForLevel(levelNumber: number): Promise<AdvantageTemplate[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await applyDefaultTemplateOrdering(
+    supabase
+      .from("advantage_templates")
+      .select("*")
+      .eq("is_active", true)
+      .or(`min_player_level.lte.${levelNumber},visible_if_locked.eq.true`),
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AdvantageTemplate[];
+}
+
+export async function getPurchasableShopTemplatesForLevel(levelNumber: number): Promise<AdvantageTemplate[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await applyDefaultTemplateOrdering(
+    supabase.from("advantage_templates").select("*").eq("is_active", true).lte("min_player_level", levelNumber),
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AdvantageTemplate[];
+}

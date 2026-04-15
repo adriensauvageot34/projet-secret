@@ -2,8 +2,10 @@ import type {
   AccusationDecision,
   AccusationStatus,
   AccusationVerdict,
+  AdvantageEffectFamily,
   AdvantageInstanceState,
   AdvantageSource,
+  AdvantageTargetType,
   ClaimedResult,
   ElementInstanceState,
   ElementType,
@@ -41,6 +43,7 @@ export interface Session {
   created_at: string;
   updated_at: string;
 }
+
 export interface Player {
   id: string;
   display_name: string;
@@ -54,6 +57,7 @@ export interface Player {
   created_at: string;
   updated_at: string;
 }
+
 export interface Participant {
   id: string;
   session_id: string;
@@ -73,6 +77,7 @@ export interface Participant {
   created_at: string;
   updated_at: string;
 }
+
 export interface Level {
   id: string;
   level_number: number;
@@ -90,6 +95,7 @@ export interface Level {
   created_at: string;
   updated_at: string;
 }
+
 export interface ElementTemplate {
   id: string;
   code: string;
@@ -111,11 +117,132 @@ export interface ElementTemplate {
   created_at: string;
   updated_at: string;
 }
-export interface ElementInstance { id: string; session_id: string; participant_id: string; template_id: string; slot_index: number; state: ElementInstanceState; claimed_result: ClaimedResult; final_result: FinalResult; proof_status: ProofStatus; activated_at?: string | null; skip_available_at?: string | null; ends_at?: string | null; cooldown_until?: string | null; points_gained: number; points_lost: number; tokens_gained: number; created_at: string; updated_at: string; }
-export interface AdvantageTemplate { id: string; code: string; title: string; description: string; effect_code: string; price_tokens: number; tier: number; }
-export interface AdvantageInstance { id: string; session_id: string; owner_participant_id: string; target_participant_id: string | null; template_id: string; source: AdvantageSource; state: AdvantageInstanceState; remaining_uses: number; activated_at?: string | null; expires_at?: string | null; created_at: string; }
-export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }
-export interface GMDecision { id: string; session_id: string; decision_type: GmDecisionType; status: GmDecisionStatus; made_by_participant_id?: string | null; target_participant_id?: string | null; other_target_participant_id?: string | null; accusation_id?: string | null; element_instance_id?: string | null; rationale?: string | null; created_at: string; applied_at?: string | null; }
-export interface ScoreEvent { id: string; session_id: string; participant_id: string; event_type: ScoreEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }
-export interface TokenEvent { id: string; session_id: string; participant_id: string; event_type: TokenEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }
-export interface FinalWheelSpin { id: string; session_id: string; participant_id: string; outcome_template_id: string; spun_at: string; notes?: string | null; }
+
+export interface ElementInstance {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  template_id: string;
+  slot_index: number;
+  state: ElementInstanceState;
+  claimed_result: ClaimedResult;
+  final_result: FinalResult;
+  proof_status: ProofStatus;
+  activated_at?: string | null;
+  skip_available_at?: string | null;
+  ends_at?: string | null;
+  cooldown_until?: string | null;
+  points_gained: number;
+  points_lost: number;
+  tokens_gained: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdvantageTemplate {
+  id: string;
+  name: string;
+
+  tier: number;
+  min_player_level: number;
+  cost_tokens: number;
+  visible_if_locked: boolean;
+  is_active: boolean;
+
+  effect_family: AdvantageEffectFamily;
+  effect_code: string;
+  target_type: AdvantageTargetType;
+  duration_seconds: number;
+
+  is_consumable: boolean;
+  max_uses: number;
+
+  description_player: string;
+  description_admin: string;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export type AdvantageTemplateRow = AdvantageTemplate;
+
+export type AdvantageTemplateInsert = Omit<AdvantageTemplate, "id" | "created_at" | "updated_at">;
+
+export type AdvantageTemplateUpdate = Partial<Omit<AdvantageTemplateInsert, "effect_code">>;
+
+export interface AdvantageInstance {
+  id: string;
+  session_id: string;
+  owner_participant_id: string;
+  target_participant_id: string | null;
+  advantage_template_id: string;
+  source: AdvantageSource;
+  state: AdvantageInstanceState;
+  remaining_uses: number;
+  activated_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+}
+
+export interface Accusation {
+  id: string;
+  session_id: string;
+  accuser_participant_id: string;
+  accused_participant_id: string;
+  adjudicated_by_participant_id?: string | null;
+  suspect_element_type?: ElementType | null;
+  suspect_template_id?: string | null;
+  linked_element_instance_id?: string | null;
+  status: AccusationStatus;
+  decision: AccusationDecision;
+  verdict: AccusationVerdict;
+  justification?: string | null;
+  created_at: string;
+  resolved_at?: string | null;
+}
+
+export interface GMDecision {
+  id: string;
+  session_id: string;
+  decision_type: GmDecisionType;
+  status: GmDecisionStatus;
+  made_by_participant_id?: string | null;
+  target_participant_id?: string | null;
+  other_target_participant_id?: string | null;
+  accusation_id?: string | null;
+  element_instance_id?: string | null;
+  rationale?: string | null;
+  created_at: string;
+  applied_at?: string | null;
+}
+
+export interface ScoreEvent {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  event_type: ScoreEventType;
+  delta: number;
+  source_table?: string | null;
+  source_id?: string | null;
+  created_at: string;
+}
+
+export interface TokenEvent {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  event_type: TokenEventType;
+  delta: number;
+  source_table?: string | null;
+  source_id?: string | null;
+  created_at: string;
+}
+
+export interface FinalWheelSpin {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  outcome_template_id: string;
+  spun_at: string;
+  notes?: string | null;
+}

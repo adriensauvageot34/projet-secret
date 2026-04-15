@@ -17,5 +17,18 @@ export type AdvantageSource = "shop" | "gm_grant" | "session_bonus";
 export type AdvantageInstanceState = "owned" | "active" | "consumed" | "expired" | "cancelled";
 export type ValidationMode = "auto" | "proof" | "gm";
 export type SkipUnlockRule = "always" | "after_delay" | "with_token" | "disabled";
-export type TargetType = "self" | "participant" | "element_instance" | "session";
-export type EffectFamily = "score" | "token" | "cooldown" | "reveal" | "protection";
+
+export type AdvantageTargetType = "self" | "other_player" | "other_participant" | "element" | "none";
+
+export type AdvantageEffectFamily =
+  | "info"
+  | "tempo"
+  | "protection"
+  | "pressure"
+  | "value"
+  | "social"
+  | "investigation"
+  | "wager"
+  | "other"
+  | "defense"
+  | "exposure";
