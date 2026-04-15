@@ -95,17 +95,19 @@ export interface ElementTemplate {
   element_type: ElementType;
   category: string;
   difficulty: number;
-  points: number;
-  duration_minutes: number;
-  skip_unlock_minutes: number;
+  base_points: number;
+  duration_seconds: number;
+  skip_unlock_rule: "one_third" | "one_half";
   validation_mode: ValidationMode;
   proof_required: boolean;
   can_be_fake: boolean;
   can_appear_in_reserve: boolean;
   is_active: boolean;
-  player_description: string;
-  short_label: string;
-  ui_tags: string[];
+  player_display_text: string;
+  ui_tag_1: string;
+  ui_tag_2: string;
+  success_button_label: string;
+  failure_button_label: string;
   created_at: string;
   updated_at: string;
 }

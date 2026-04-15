@@ -33,19 +33,20 @@ export function isEligibleForReserve(
 }
 
 export function getEndTime(
-  template: Pick<ElementTemplate, "duration_minutes">,
+  template: Pick<ElementTemplate, "duration_seconds">,
   activatedAt: string | Date,
 ): Date {
   const start = typeof activatedAt === "string" ? new Date(activatedAt) : activatedAt;
-  return new Date(start.getTime() + template.duration_minutes * 60_000);
+  return new Date(start.getTime() + template.duration_seconds * 1_000);
 }
 
 export function getSkipUnlockTime(
-  template: Pick<ElementTemplate, "skip_unlock_minutes">,
+  template: Pick<ElementTemplate, "duration_seconds" | "skip_unlock_rule">,
   activatedAt: string | Date,
 ): Date {
   const start = typeof activatedAt === "string" ? new Date(activatedAt) : activatedAt;
-  return new Date(start.getTime() + template.skip_unlock_minutes * 60_000);
+  const ratio = template.skip_unlock_rule === "one_half" ? 0.5 : 1 / 3;
+  return new Date(start.getTime() + Math.ceil(template.duration_seconds * ratio) * 1_000);
 }
 
 export const computeEndTime = getEndTime;
