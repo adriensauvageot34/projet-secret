@@ -30,8 +30,16 @@ export type ProofStatus = "not_required" | "pending" | "provided" | "denied";
 export type AccusationStatus = "draft" | "submitted" | "under_review" | "resolved" | "cancelled";
 export type AccusationDecision = "pending" | "accepted" | "rejected";
 export type AccusationVerdict = "correct" | "incorrect" | "inconclusive" | "none";
-export type GmDecisionType = "accusation_adjudication" | "element_validation" | "manual_adjustment";
-export type GmDecisionStatus = "draft" | "recorded" | "applied" | "void";
+export type GmDecisionType =
+  | "validation_override"
+  | "accusation_arbitration"
+  | "retro_cancel"
+  | "fake_element_resolution"
+  | "abuse_correction"
+  | "manual_bonus"
+  | "manual_penalty"
+  | "other";
+export type GmDecisionStatus = "logged" | "applied" | "cancelled";
 export type ScoreEventType =
   | "element_success"
   | "element_failure"

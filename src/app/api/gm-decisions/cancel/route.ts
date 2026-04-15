@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { applyGMDecision } from "@/lib/game/services/gm-decisions";
+import { cancelGMDecision } from "@/lib/game/services/gm-decisions";
 
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
-    const decision = await applyGMDecision(payload);
+    const decision = await cancelGMDecision(payload);
 
     return NextResponse.json({ ok: true, data: decision });
   } catch (error) {
