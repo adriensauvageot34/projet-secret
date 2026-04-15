@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/mutations/advantage-instances";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAdvantageEffectHandler } from "@/lib/game/engine/advantage-effect-registry";
+import { createTokenEvent } from "@/lib/game/services/token-events";
 import {
   canActivateAdvantageInstance,
   canConsumeAdvantageUse,
@@ -106,29 +107,14 @@ export async function purchaseAdvantageForParticipant(input: {
     throw new Error(`Failed to create purchased advantage: ${instanceError?.message ?? "unknown error"}`);
   }
 
-  const { error: tokenEventError } = await supabase.from("token_events").insert({
-    session_id: participant.session_id,
-    participant_id: participant.id,
-    event_type: "purchase",
-    delta: -template.cost_tokens,
-    source_table: "advantage_instances",
-    source_id: instanceData.id,
-    related_advantage_instance_id: instanceData.id,
-    meta: { template_id: template.id, effect_code: template.effect_code },
+  await createTokenEvent({
+    participantId: participant.id,
+    sessionId: participant.session_id,
+    eventType: "shop_purchase",
+    deltaTokens: -template.cost_tokens,
+    notes: input.gmNotes ?? null,
+    relatedAdvantageInstanceId: instanceData.id,
   });
-
-  if (tokenEventError) {
-    throw new Error(`Failed to create purchase token event: ${tokenEventError.message}`);
-  }
-
-  const { error: participantUpdateError } = await supabase
-    .from("participants")
-    .update({ current_tokens: Math.max(0, participant.current_tokens - template.cost_tokens) })
-    .eq("id", participant.id);
-
-  if (participantUpdateError) {
-    throw new Error(`Failed to update participant current_tokens: ${participantUpdateError.message}`);
-  }
 
   return instanceData as AdvantageInstance;
 }

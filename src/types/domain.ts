@@ -223,7 +223,30 @@ export interface AdvantageInstanceWithResolvedContext extends AdvantageInstanceW
   target_element_template_name?: string | null;
 }
 export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }
-export interface GMDecision { id: string; session_id: string; decision_type: GmDecisionType; status: GmDecisionStatus; made_by_participant_id?: string | null; target_participant_id?: string | null; other_target_participant_id?: string | null; accusation_id?: string | null; element_instance_id?: string | null; rationale?: string | null; created_at: string; applied_at?: string | null; }
+export interface GMDecision { id: string; session_id: string; decision_type: GmDecisionType; status: GmDecisionStatus; made_by_participant_id?: string | null; target_participant_id?: string | null; other_target_participant_id?: string | null; accusation_id?: string | null; element_instance_id?: string | null; target_token_event_id?: string | null; decision_label?: string | null; rationale?: string | null; created_at: string; applied_at?: string | null; }
 export interface ScoreEvent { id: string; session_id: string; participant_id: string; event_type: ScoreEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }
-export interface TokenEvent { id: string; session_id: string; participant_id: string; event_type: TokenEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }
+export interface TokenEvent {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  event_type: TokenEventType;
+  delta_tokens: number;
+  created_at: string;
+  notes?: string | null;
+  related_accusation_id?: string | null;
+  related_advantage_instance_id?: string | null;
+  related_gm_decision_id?: string | null;
+  related_element_instance_id?: string | null;
+}
+
+export interface TokenEventDetail extends TokenEvent {
+  session_name: string | null;
+  participant_display_name: string | null;
+  related_accusation_status: string | null;
+  related_advantage_name: string | null;
+  related_gm_decision_label: string | null;
+  token_event_label: string;
+  is_positive: boolean;
+  is_negative: boolean;
+}
 export interface FinalWheelSpin { id: string; session_id: string; participant_id: string; outcome_template_id: string; spun_at: string; notes?: string | null; }
