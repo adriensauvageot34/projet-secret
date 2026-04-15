@@ -48,6 +48,7 @@ Puis ouvrir `http://localhost:3000`.
 Voir aussi:
 - `docs/gm-decisions.md` pour la couche d'arbitrage GM (décision vs effets ledger).
 - `docs/accusations.md` pour la couche accusations (soupçon social, arbitrage, impacts).
+- `docs/score-events.md` pour la couche ledger score (mouvements unitaires, enrichissements de lecture, audit).
 
 ## Inclus dans ce MVP
 

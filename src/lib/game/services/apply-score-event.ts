@@ -1,6 +1,5 @@
-export async function applyScoreEvent(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
+import { createScoreEvent, type CreateScoreEventInput } from "@/lib/game/services/score-events";
+
+export async function applyScoreEvent(input: CreateScoreEventInput) {
+  return createScoreEvent(input);
 }

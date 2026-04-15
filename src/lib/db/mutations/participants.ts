@@ -2,6 +2,7 @@ import type { ParticipantRole, ParticipantStatus } from "@/lib/game/enums";
 import type { Participant, Player } from "@/types/domain";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createTokenEvent } from "@/lib/game/services/token-events";
+import { createScoreEvent } from "@/lib/game/services/score-events";
 
 type ElementInstanceSlotRow = {
   state: string;
@@ -27,31 +28,17 @@ export async function addScore(participantId: string, delta: number, reason: str
     throw new Error(`Failed to load participant: ${participantError?.message ?? "not found"}`);
   }
 
-  const nextScore = participant.current_score + delta;
-  assertNonNegativeResult(nextScore, "Participant current_score");
+  assertNonNegativeResult(participant.current_score + delta, "Participant current_score");
 
-  const { error: scoreEventError } = await supabase.from("score_events").insert({
-    session_id: participant.session_id,
-    participant_id: participant.id,
-    event_type: "gm_adjustment",
-    delta,
-    meta: { reason },
+  await createScoreEvent({
+    participantId: participant.id,
+    sessionId: participant.session_id,
+    eventType: "manual_adjustment",
+    deltaPoints: delta,
+    notes: reason,
   });
 
-  if (scoreEventError) {
-    throw new Error(`Failed to insert score event: ${scoreEventError.message}`);
-  }
-
-  const { error: participantUpdateError } = await supabase
-    .from("participants")
-    .update({ current_score: nextScore })
-    .eq("id", participantId);
-
-  if (participantUpdateError) {
-    throw new Error(`Failed to update participant score: ${participantUpdateError.message}`);
-  }
-
-  return nextScore;
+  return participant.current_score + delta;
 }
 
 export async function addTokens(participantId: string, delta: number, reason: string): Promise<number> {

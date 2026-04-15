@@ -41,16 +41,17 @@ export type GmDecisionType =
   | "other";
 export type GmDecisionStatus = "logged" | "applied" | "cancelled";
 export type ScoreEventType =
-  | "element_success"
-  | "element_failure"
   | "mission_success"
-  | "mission_fail"
-  | "mission_broken"
   | "constraint_success"
-  | "constraint_fail"
-  | "constraint_broken"
-  | "accusation"
-  | "gm_adjustment";
+  | "combo_2"
+  | "combo_3"
+  | "mission_constraint_bonus"
+  | "skip_penalty"
+  | "constraint_break_penalty"
+  | "fake_bait_bonus"
+  | "manual_adjustment"
+  | "retro_validation_cancel"
+  | "other";
 export type TokenEventType =
   | "accusation_correct"
   | "shop_purchase"

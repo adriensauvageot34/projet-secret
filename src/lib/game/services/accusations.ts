@@ -4,7 +4,7 @@ import type { Accusation, ElementInstance, ElementTemplate, Participant } from "
 import type { AccusationDecision, AccusationStatus, AccusationVerdict, ElementType } from "@/lib/game/enums";
 import { createAccusationRecord, updateAccusationRecord } from "@/lib/db/mutations/accusations";
 import { createTokenEvent } from "@/lib/game/services/token-events";
-import { createScoreEventRecord } from "@/lib/db/mutations/score-events";
+import { createScoreEvent } from "@/lib/game/services/score-events";
 import { createGMDecisionRecord } from "@/lib/db/mutations/gm-decisions";
 import { getAccusationById, type AccusationDetail } from "@/lib/db/queries/accusations";
 
@@ -39,7 +39,7 @@ export const adjudicateAccusationSchema = z.object({
   rewardTokens: z.number().int().min(0).nullable().optional(),
   cancelledPreviousValidation: z.boolean().optional(),
   fakeBaitBonusTokens: z.number().int().min(0).optional(),
-  fakeBaitBonusScore: z.number().int().optional(),
+  fakeBaitBonusScore: z.number().int().min(0).optional(),
   createGmDecisionRecord: z.boolean().optional(),
 });
 
@@ -365,17 +365,15 @@ export async function adjudicateAccusation(input: AdjudicateAccusationInput): Pr
     }
 
     if (bonusScore !== 0) {
-      await createScoreEventRecord({
-        session_id: accusation.session_id,
-        participant_id: accusation.accused_participant_id,
-        event_type: "gm_adjustment",
-        delta: bonusScore,
+      await createScoreEvent({
+        participantId: accusation.accused_participant_id,
+        sessionId: accusation.session_id,
+        eventType: "fake_bait_bonus",
+        deltaPoints: bonusScore,
         notes: payload.notesAdmin ?? "Bonus score fake bait",
-        related_accusation_id: accusation.id,
-        related_gm_decision_id: null,
-        created_at: (payload.adjudicatedAt ?? new Date()).toISOString(),
-        source_table: "accusations",
-        source_id: accusation.id,
+        relatedAccusationId: accusation.id,
+        relatedElementInstanceId: accusation.related_element_instance_id ?? null,
+        createdAt: payload.adjudicatedAt,
       });
     }
   }
