@@ -222,7 +222,27 @@ export interface AdvantageInstanceWithResolvedContext extends AdvantageInstanceW
   target_participant_display_name?: string | null;
   target_element_template_name?: string | null;
 }
-export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }
+export interface Accusation {
+  id: string;
+  session_id: string;
+  accuser_participant_id: string;
+  accused_participant_id: string;
+  adjudicated_by_participant_id?: string | null;
+  suspected_type: ElementType;
+  suspected_template_id: string;
+  related_element_instance_id?: string | null;
+  status: AccusationStatus;
+  decision?: AccusationDecision | null;
+  verdict?: AccusationVerdict | null;
+  justification: string;
+  created_at: string;
+  adjudicated_at?: string | null;
+  is_receivable?: boolean | null;
+  triggered_fake_bait: boolean;
+  reward_tokens: number;
+  cancelled_previous_validation: boolean;
+  notes_admin?: string | null;
+}
 export interface GMDecision {
   id: string;
   session_id: string;
@@ -252,6 +272,7 @@ export interface ScoreEvent {
   event_type: ScoreEventType;
   delta: number;
   notes?: string | null;
+  related_accusation_id?: string | null;
   related_gm_decision_id?: string | null;
   source_table?: string | null;
   source_id?: string | null;

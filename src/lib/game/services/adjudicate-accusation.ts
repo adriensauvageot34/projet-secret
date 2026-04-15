@@ -1,6 +1,1 @@
-export async function adjudicateAccusation(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
-}
+export { adjudicateAccusation, adjudicateAccusationSchema, type AdjudicateAccusationInput } from "@/lib/game/services/accusations";
