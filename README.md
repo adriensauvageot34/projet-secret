@@ -27,6 +27,26 @@ npm run dev
 
 Puis ouvrir `http://localhost:3000`.
 
+
+## Liaison Supabase CLI (projet distant)
+
+Préparer le link (sans push de migration):
+
+```bash
+export SUPABASE_ACCESS_TOKEN=...
+export SUPABASE_PROJECT_REF=...
+# optionnel si le CLI le demande
+export SUPABASE_DB_PASSWORD=...
+./scripts/supabase-link.sh
+```
+
+Ensuite seulement:
+
+```bash
+supabase db push
+supabase db seed --file supabase/seed/seed.sql
+```
+
 ## Structure du projet
 
 - `src/app`: pages, layouts, API routes
