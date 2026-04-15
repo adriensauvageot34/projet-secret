@@ -50,3 +50,23 @@ export type ValidationMode = "auto" | "proof" | "gm";
 export type SkipUnlockRule = "always" | "after_delay" | "with_token" | "disabled";
 export type TargetType = "self" | "participant" | "element_instance" | "session";
 export type EffectFamily = "score" | "token" | "cooldown" | "reveal" | "protection";
+
+export type AdvantageEffectFamily =
+  | "investigation"
+  | "tempo"
+  | "defense"
+  | "value"
+  | "wager"
+  | "pressure"
+  | "exposure"
+  | "info"
+  | "protection"
+  | "social"
+  | "other";
+
+export type AdvantageTargetType =
+  | "self"
+  | "other_participant"
+  | "other_player"
+  | "element"
+  | "none";
