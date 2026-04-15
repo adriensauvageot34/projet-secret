@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { GMDecision, Participant } from "@/types/domain";
 import type { GmDecisionStatus, GmDecisionType } from "@/lib/game/enums";
 import { createGMDecisionRecord, updateGMDecisionRecord } from "@/lib/db/mutations/gm-decisions";
-import { createScoreEventRecord } from "@/lib/db/mutations/score-events";
+import { createScoreEvent } from "@/lib/game/services/score-events";
 import { createTokenEvent } from "@/lib/game/services/token-events";
 import { getGMDecisionById, type GMDecisionDetail } from "@/lib/db/queries/gm-decisions";
 
@@ -259,43 +259,16 @@ async function applyScoreImpact(decision: GMDecision, appliedAt: Date): Promise<
     throw new Error("Cannot apply score impact without target_participant_id");
   }
 
-  const supabase = createServerSupabaseClient();
-  const { data: participant, error: participantError } = await supabase
-    .from("participants")
-    .select("id, current_score")
-    .eq("id", decision.target_participant_id)
-    .single();
-
-  if (participantError || !participant) {
-    throw new Error(`Failed to load target participant for score impact: ${participantError?.message ?? "not found"}`);
-  }
-
-  const nextScore = participant.current_score + delta;
-
-  if (nextScore < 0) {
-    throw new Error("Score impact would make participant.current_score negative");
-  }
-
-  await createScoreEventRecord({
-    session_id: decision.session_id,
-    participant_id: decision.target_participant_id,
-    event_type: "gm_adjustment",
-    delta,
+  await createScoreEvent({
+    participantId: decision.target_participant_id,
+    sessionId: decision.session_id,
+    eventType: "manual_adjustment",
+    deltaPoints: delta,
     notes: `GM decision ${decision.id}: ${decision.decision_label}`,
-    related_gm_decision_id: decision.id,
-    created_at: appliedAt.toISOString(),
-    source_table: "gm_decisions",
-    source_id: decision.id,
+    relatedGmDecisionId: decision.id,
+    createdAt: appliedAt,
   });
 
-  const { error: updateError } = await supabase
-    .from("participants")
-    .update({ current_score: nextScore })
-    .eq("id", decision.target_participant_id);
-
-  if (updateError) {
-    throw new Error(`Failed to update participant.current_score: ${updateError.message}`);
-  }
 }
 
 async function applyTokenImpact(decision: GMDecision, appliedAt: Date): Promise<void> {

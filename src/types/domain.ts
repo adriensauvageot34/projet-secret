@@ -270,13 +270,25 @@ export interface ScoreEvent {
   session_id: string;
   participant_id: string;
   event_type: ScoreEventType;
-  delta: number;
+  delta_points: number;
   notes?: string | null;
+  related_element_instance_id?: string | null;
   related_accusation_id?: string | null;
   related_gm_decision_id?: string | null;
-  source_table?: string | null;
-  source_id?: string | null;
   created_at: string;
+}
+
+export interface ScoreEventDetail extends ScoreEvent {
+  session_name: string | null;
+  participant_display_name: string | null;
+  related_element_state: string | null;
+  related_accusation_status: string | null;
+  related_gm_decision_label: string | null;
+  related_element_type: string | null;
+  score_event_label: string;
+  is_positive_score_event: boolean;
+  is_negative_score_event: boolean;
+  targeted_by_gm_decisions: Pick<GMDecision, "id" | "decision_label" | "decision_type" | "status" | "created_at">[];
 }
 export interface TokenEvent {
   id: string;

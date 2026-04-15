@@ -191,11 +191,8 @@ export function createScoreEventFromInstance(
     if (instance.final_result === "success") {
       return "mission_success";
     }
-    if (instance.final_result === "fail") {
-      return "mission_fail";
-    }
-    if (instance.final_result === "broken") {
-      return "mission_broken";
+    if (instance.final_result === "skipped") {
+      return "skip_penalty";
     }
   }
 
@@ -203,11 +200,11 @@ export function createScoreEventFromInstance(
     if (instance.final_result === "success") {
       return "constraint_success";
     }
-    if (instance.final_result === "fail") {
-      return "constraint_fail";
-    }
     if (instance.final_result === "broken") {
-      return "constraint_broken";
+      return "constraint_break_penalty";
+    }
+    if (instance.final_result === "skipped") {
+      return "skip_penalty";
     }
   }
 
