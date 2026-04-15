@@ -412,3 +412,110 @@ set
   description_player = excluded.description_player,
   description_admin = excluded.description_admin,
   updated_at = timezone('utc', now());
+
+-- Session participants for MVP runtime.
+with selected_session as (
+  select id
+  from sessions
+  where name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
+  limit 1
+),
+level_one as (
+  select id
+  from levels
+  where level_number = 1
+  limit 1
+),
+players_for_session as (
+  select
+    p.id as player_id,
+    p.display_name,
+    case
+      when p.display_name = 'Adrien' then 'gm'
+      else 'player'
+    end as role,
+    case
+      when p.display_name = 'Adrien' then 'gm'
+      else 'ready'
+    end as current_status,
+    case
+      when p.can_play = true or p.can_be_gm = true then true
+      else false
+    end as include_in_session
+  from players p
+)
+insert into participants (
+  session_id,
+  player_id,
+  current_level_id,
+  display_name,
+  role,
+  current_status,
+  current_score,
+  current_tokens,
+  combo_streak_current,
+  mission_slot_max,
+  constraint_slot_max,
+  completed_elements_count,
+  waiting_slot_count,
+  blocked_slot_count
+)
+select
+  s.id,
+  pfs.player_id,
+  l1.id,
+  pfs.display_name,
+  pfs.role,
+  pfs.current_status,
+  0,
+  0,
+  0,
+  2,
+  2,
+  0,
+  0,
+  0
+from players_for_session pfs
+cross join selected_session s
+cross join level_one l1
+where pfs.include_in_session = true
+on conflict (session_id, player_id) do update
+set
+  current_level_id = excluded.current_level_id,
+  display_name = excluded.display_name,
+  role = excluded.role,
+  current_status = excluded.current_status,
+  mission_slot_max = excluded.mission_slot_max,
+  constraint_slot_max = excluded.constraint_slot_max,
+  updated_at = timezone('utc', now());
+
+update sessions s
+set
+  session_gm_participant_id = gm_participant.id,
+  updated_at = timezone('utc', now())
+from participants gm_participant
+join players gm_player
+  on gm_player.id = gm_participant.player_id
+where s.name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
+  and gm_participant.session_id = s.id
+  and gm_player.display_name = 'Adrien';
+
+insert into wheel_outcome_templates (
+  code,
+  label,
+  description,
+  effect_code,
+  weight
+)
+values
+  ('wheel_bonus_tokens_small', 'Bonus jetons +2', 'Accorde un petit bonus de jetons au joueur.', 'bonus_tokens_small', 3),
+  ('wheel_bonus_score_small', 'Bonus score +2', 'Accorde un petit bonus de score au joueur.', 'bonus_score_small', 3),
+  ('wheel_bonus_score_big', 'Bonus score +5', 'Accorde un bonus de score important au joueur.', 'bonus_score_big', 1),
+  ('wheel_no_effect', 'Neutre', 'Aucun effet.', 'no_effect', 4),
+  ('wheel_penalty_tokens', 'Malus jetons -1', 'Retire un jeton au joueur.', 'penalty_tokens_small', 2)
+on conflict (code) do update
+set
+  label = excluded.label,
+  description = excluded.description,
+  effect_code = excluded.effect_code,
+  weight = excluded.weight;
