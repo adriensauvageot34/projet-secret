@@ -1,6 +1,7 @@
 import type { ParticipantRole, ParticipantStatus } from "@/lib/game/enums";
 import type { Participant, Player } from "@/types/domain";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createTokenEvent } from "@/lib/game/services/token-events";
 
 type ElementInstanceSlotRow = {
   state: string;
@@ -69,26 +70,13 @@ export async function addTokens(participantId: string, delta: number, reason: st
   const nextTokens = participant.current_tokens + delta;
   assertNonNegativeResult(nextTokens, "Participant current_tokens");
 
-  const { error: tokenEventError } = await supabase.from("token_events").insert({
-    session_id: participant.session_id,
-    participant_id: participant.id,
-    event_type: "gm_adjustment",
-    delta,
-    meta: { reason },
+  await createTokenEvent({
+    participantId: participant.id,
+    sessionId: participant.session_id,
+    eventType: "manual_adjustment",
+    deltaTokens: delta,
+    notes: reason,
   });
-
-  if (tokenEventError) {
-    throw new Error(`Failed to insert token event: ${tokenEventError.message}`);
-  }
-
-  const { error: participantUpdateError } = await supabase
-    .from("participants")
-    .update({ current_tokens: nextTokens })
-    .eq("id", participantId);
-
-  if (participantUpdateError) {
-    throw new Error(`Failed to update participant tokens: ${participantUpdateError.message}`);
-  }
 
   return nextTokens;
 }

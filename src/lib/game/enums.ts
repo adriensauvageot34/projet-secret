@@ -43,7 +43,15 @@ export type ScoreEventType =
   | "constraint_broken"
   | "accusation"
   | "gm_adjustment";
-export type TokenEventType = "reward" | "purchase" | "penalty" | "gm_adjustment";
+export type TokenEventType =
+  | "accusation_correct"
+  | "shop_purchase"
+  | "refund"
+  | "fake_bait_bonus"
+  | "manual_adjustment"
+  | "bonus_effect"
+  | "cancellation"
+  | "other";
 export type AdvantageInstanceSource = "shop" | "bonus" | "fake_bait" | "manual";
 export type AdvantageInstanceState = "owned" | "active" | "consumed" | "expired" | "cancelled";
 export type ValidationMode = "auto" | "proof" | "gm";

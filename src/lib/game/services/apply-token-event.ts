@@ -1,6 +1,6 @@
-export async function applyTokenEvent(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
+import { createTokenEvent, type CreateTokenEventInput } from "@/lib/game/services/token-events";
+
+export async function applyTokenEvent(input: CreateTokenEventInput) {
+  const event = await createTokenEvent(input);
+  return { ok: true, event };
 }
