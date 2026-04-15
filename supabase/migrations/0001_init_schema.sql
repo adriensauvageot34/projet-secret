@@ -205,16 +205,68 @@ create table element_instances (
 
 create table advantage_templates (
   id uuid primary key default gen_random_uuid(),
-  code text not null unique,
-  title text not null,
-  description text not null,
-  effect_code text not null,
+  name text not null unique,
+  tier int not null,
+  min_player_level int not null,
+  cost_tokens int not null,
+  visible_if_locked boolean not null default true,
+  is_active boolean not null default true,
   effect_family text not null,
-  price_tokens int not null,
-  tier int not null default 1,
-  config jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default timezone('utc', now())
+  effect_code text not null unique,
+  target_type text not null,
+  duration_seconds int not null default 0,
+  is_consumable boolean not null default true,
+  max_uses int not null default 1,
+  description_player text not null default '',
+  description_admin text not null default '',
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint chk_advantage_templates_tier check (tier >= 1),
+  constraint chk_advantage_templates_min_player_level check (min_player_level >= 1),
+  constraint chk_advantage_templates_cost_tokens check (cost_tokens >= 0),
+  constraint chk_advantage_templates_duration_seconds check (duration_seconds >= 0),
+  constraint chk_advantage_templates_max_uses check (max_uses >= 0),
+  constraint chk_advantage_templates_effect_family check (
+    effect_family in (
+      'investigation',
+      'tempo',
+      'defense',
+      'value',
+      'wager',
+      'pressure',
+      'exposure',
+      'score',
+      'token',
+      'cooldown',
+      'reveal',
+      'protection'
+    )
+  ),
+  constraint chk_advantage_templates_target_type check (
+    target_type in (
+      'self',
+      'other_participant',
+      'other_player',
+      'element',
+      'none'
+    )
+  ),
+  constraint chk_advantage_templates_consumption_coherence check (
+    (
+      is_consumable = true
+      and max_uses >= 1
+    )
+    or (
+      is_consumable = false
+      and max_uses >= 0
+    )
+  )
 );
+
+create trigger trg_advantage_templates_set_updated_at
+before update on advantage_templates
+for each row
+execute function set_updated_at();
 
 create table advantage_instances (
   id uuid primary key default gen_random_uuid(),

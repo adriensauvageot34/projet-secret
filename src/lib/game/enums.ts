@@ -15,6 +15,15 @@ export type ScoreEventType = "element_success" | "element_failure" | "accusation
 export type TokenEventType = "reward" | "purchase" | "penalty" | "gm_adjustment";
 export type AdvantageSource = "shop" | "gm_grant" | "session_bonus";
 export type AdvantageInstanceState = "owned" | "active" | "consumed" | "expired" | "cancelled";
+export type AdvantageTargetType = "self" | "other_participant" | "other_player" | "element" | "none";
+export type AdvantageEffectFamily =
+  | "investigation"
+  | "tempo"
+  | "defense"
+  | "value"
+  | "wager"
+  | "pressure"
+  | "exposure";
 export type ValidationMode = "auto" | "proof" | "gm";
 export type SkipUnlockRule = "always" | "after_delay" | "with_token" | "disabled";
 export type TargetType = "self" | "participant" | "element_instance" | "session";
