@@ -1,6 +1,15 @@
-export async function activateElement(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
+import {
+  activateElement as activateElementInstance,
+  getEndsAt,
+  getSkipAvailableAt,
+} from "@/lib/db/mutations/element-instances";
+
+export async function activateElement(participantId: string, templateId: string, slotIndex: number, isFake = false) {
+  const instance = await activateElementInstance({ participantId, templateId, slotIndex, isFake });
+
+  return {
+    instance,
+    endsAt: getEndsAt(instance),
+    skipAvailableAt: getSkipAvailableAt(instance),
+  };
 }

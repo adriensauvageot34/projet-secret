@@ -4,8 +4,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type ElementInstanceSlotRow = {
   state: string;
-  final_result: string;
-  proof_status: string;
   cooldown_until: string | null;
 };
 
@@ -157,7 +155,7 @@ export async function recomputeParticipantSlots(participantId: string): Promise<
 
   const { data: rows, error } = await supabase
     .from("element_instances")
-    .select("state, final_result, proof_status, cooldown_until")
+    .select("state, cooldown_until")
     .eq("participant_id", participantId);
 
   if (error) {
@@ -167,25 +165,19 @@ export async function recomputeParticipantSlots(participantId: string): Promise<
   const now = Date.now();
   const elementRows = (rows ?? []) as ElementInstanceSlotRow[];
 
-  const completed_elements_count = elementRows.filter(
-    (row) => row.final_result !== "pending" || row.state === "resolved",
+  const completed_elements_count = elementRows.filter((row) =>
+    ["completed", "failed", "broken", "skipped", "expired"].includes(row.state),
   ).length;
 
-  const waiting_slot_count = elementRows.filter((row) => {
-    if (row.state === "reserve") {
-      return true;
-    }
+  const waiting_slot_count = elementRows.filter((row) => row.state === "cooldown").length;
 
-    if (!row.cooldown_until) {
+  const blocked_slot_count = elementRows.filter((row) => {
+    if (row.state !== "cooldown") {
       return false;
     }
 
-    return new Date(row.cooldown_until).getTime() > now;
+    return row.cooldown_until ? new Date(row.cooldown_until).getTime() > now : false;
   }).length;
-
-  const blocked_slot_count = elementRows.filter(
-    (row) => row.state === "claimed" || row.proof_status === "pending" || row.proof_status === "submitted",
-  ).length;
 
   const { error: updateError } = await supabase
     .from("participants")

@@ -51,7 +51,7 @@ export function getSkipUnlockTime(
 export const computeEndTime = getEndTime;
 export const computeSkipTime = getSkipUnlockTime;
 
-export async function getAvailableTemplatesForParticipant(participant: Pick<Participant, "current_level">): Promise<ElementTemplate[]> {
+export async function getAvailableTemplatesForParticipant(participant: { current_level: number }): Promise<ElementTemplate[]> {
   const [level, templates] = await Promise.all([
     getLevelByNumber(participant.current_level),
     getActiveTemplates(),

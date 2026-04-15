@@ -97,6 +97,6 @@ export async function getTemplatesForParticipant(level: number): Promise<Element
   return (data ?? []) as ElementTemplate[];
 }
 
-export async function getTemplatesForParticipantRow(participant: Pick<Participant, "current_level">): Promise<ElementTemplate[]> {
+export async function getTemplatesForParticipantRow(participant: { current_level: number }): Promise<ElementTemplate[]> {
   return getTemplatesForParticipant(participant.current_level);
 }
