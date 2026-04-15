@@ -1,6 +1,10 @@
-export async function buyAdvantage(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
+import { purchaseAdvantageForParticipant } from "@/lib/game/services/advantage-instance-service";
+
+export async function buyAdvantage(input: {
+  templateId: string;
+  participantId: string;
+  gmNotes?: string;
+}) {
+  const instance = await purchaseAdvantageForParticipant(input);
+  return { ok: true, instance };
 }

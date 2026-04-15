@@ -2,8 +2,6 @@ import type {
   AccusationDecision,
   AccusationStatus,
   AccusationVerdict,
-  AdvantageInstanceState,
-  AdvantageSource,
   ClaimedResult,
   ElementInstanceState,
   ElementType,
@@ -178,7 +176,52 @@ export interface AdvantageTemplate {
   created_at: string;
   updated_at: string;
 }
-export interface AdvantageInstance { id: string; session_id: string; owner_participant_id: string; target_participant_id: string | null; advantage_template_id: string; source: AdvantageSource; state: AdvantageInstanceState; remaining_uses: number; activated_at?: string | null; expires_at?: string | null; created_at: string; }
+export type AdvantageInstanceSource = "shop" | "bonus" | "fake_bait" | "manual";
+
+export type AdvantageInstanceState =
+  | "owned"
+  | "active"
+  | "consumed"
+  | "expired"
+  | "cancelled";
+
+export interface AdvantageInstance {
+  id: string;
+
+  source: AdvantageInstanceSource;
+  cost_paid: number;
+  state: AdvantageInstanceState;
+
+  activated_at: string | null;
+  expires_at: string | null;
+
+  remaining_uses: number;
+  gm_notes: string;
+
+  advantage_template_id: string;
+  session_id: string;
+  assigned_player_id: string;
+  participant_id: string;
+
+  target_participant_id: string | null;
+  target_element_instance_id: string | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdvantageInstanceWithTemplate extends AdvantageInstance {
+  template: Pick<
+    AdvantageTemplate,
+    "name" | "effect_code" | "effect_family" | "target_type" | "duration_seconds" | "max_uses" | "cost_tokens"
+  >;
+}
+
+export interface AdvantageInstanceWithResolvedContext extends AdvantageInstanceWithTemplate {
+  participant_display_name?: string | null;
+  target_participant_display_name?: string | null;
+  target_element_template_name?: string | null;
+}
 export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }
 export interface GMDecision { id: string; session_id: string; decision_type: GmDecisionType; status: GmDecisionStatus; made_by_participant_id?: string | null; target_participant_id?: string | null; other_target_participant_id?: string | null; accusation_id?: string | null; element_instance_id?: string | null; rationale?: string | null; created_at: string; applied_at?: string | null; }
 export interface ScoreEvent { id: string; session_id: string; participant_id: string; event_type: ScoreEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }

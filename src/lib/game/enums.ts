@@ -44,7 +44,7 @@ export type ScoreEventType =
   | "accusation"
   | "gm_adjustment";
 export type TokenEventType = "reward" | "purchase" | "penalty" | "gm_adjustment";
-export type AdvantageSource = "shop" | "gm_grant" | "session_bonus";
+export type AdvantageInstanceSource = "shop" | "bonus" | "fake_bait" | "manual";
 export type AdvantageInstanceState = "owned" | "active" | "consumed" | "expired" | "cancelled";
 export type ValidationMode = "auto" | "proof" | "gm";
 export type SkipUnlockRule = "always" | "after_delay" | "with_token" | "disabled";

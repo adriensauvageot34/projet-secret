@@ -1,6 +1,10 @@
-export async function activateAdvantage(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
+import { activateParticipantAdvantage } from "@/lib/game/services/advantage-instance-service";
+
+export async function activateAdvantage(input: {
+  advantageInstanceId: string;
+  targetParticipantId?: string | null;
+  targetElementInstanceId?: string | null;
+}) {
+  const instance = await activateParticipantAdvantage(input);
+  return { ok: true, instance };
 }
