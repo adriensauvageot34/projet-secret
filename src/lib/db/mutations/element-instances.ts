@@ -14,17 +14,16 @@ type ResolveElementOptions = {
   skippedCooldownMinutes?: number;
 };
 
-function addMinutes(base: Date, minutes: number): string {
-  return new Date(base.getTime() + minutes * 60_000).toISOString();
+function addSeconds(base: Date, seconds: number): string {
+  return new Date(base.getTime() + seconds * 1_000).toISOString();
 }
 
-function computeSkipAvailableAt(activatedAt: Date, template: Pick<ElementTemplate, "skip_unlock_minutes" | "duration_minutes">): string {
-  if (template.skip_unlock_minutes > 0) {
-    return addMinutes(activatedAt, template.skip_unlock_minutes);
-  }
-
-  // fallback dynamique: moitié de durée (règle modifiable plus tard)
-  return addMinutes(activatedAt, Math.ceil(template.duration_minutes / 2));
+function computeSkipAvailableAt(
+  activatedAt: Date,
+  template: Pick<ElementTemplate, "skip_unlock_rule" | "duration_seconds">,
+): string {
+  const ratio = template.skip_unlock_rule === "one_half" ? 0.5 : 1 / 3;
+  return addSeconds(activatedAt, Math.ceil(template.duration_seconds * ratio));
 }
 
 function assertSingleRow<T>(data: T | null, error: { message: string } | null, context: string): T {
@@ -48,7 +47,7 @@ export async function activateElement(input: ActivateElementInput): Promise<Elem
 
   const { data: template, error: templateError } = await supabase
     .from("element_templates")
-    .select("id, duration_minutes, skip_unlock_minutes, proof_required")
+    .select("id, duration_seconds, skip_unlock_rule, proof_required")
     .eq("id", input.templateId)
     .maybeSingle();
 
@@ -63,7 +62,7 @@ export async function activateElement(input: ActivateElementInput): Promise<Elem
     active_slot_index: input.slotIndex,
     is_fake: input.isFake ?? false,
     activated_at: activatedAt.toISOString(),
-    ends_at: addMinutes(activatedAt, runtimeTemplate.duration_minutes),
+    ends_at: addSeconds(activatedAt, runtimeTemplate.duration_seconds),
     skip_available_at: computeSkipAvailableAt(activatedAt, runtimeTemplate),
     proof_status: runtimeTemplate.proof_required ? "pending" : "not_required",
   };
@@ -137,7 +136,7 @@ export async function resolveElement(
 
   if (finalResult === "skipped") {
     const cooldownMinutes = options.skippedCooldownMinutes ?? 0;
-    updatePayload.cooldown_until = cooldownMinutes > 0 ? addMinutes(new Date(), cooldownMinutes) : null;
+    updatePayload.cooldown_until = cooldownMinutes > 0 ? addSeconds(new Date(), cooldownMinutes * 60) : null;
   }
 
   const { data, error } = await supabase
