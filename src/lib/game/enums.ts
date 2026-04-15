@@ -27,9 +27,9 @@ export type FinalResult =
   | "gm_voided";
 
 export type ProofStatus = "not_required" | "pending" | "provided" | "denied";
-export type AccusationStatus = "draft" | "submitted" | "under_review" | "resolved" | "cancelled";
-export type AccusationDecision = "pending" | "accepted" | "rejected";
-export type AccusationVerdict = "correct" | "incorrect" | "inconclusive" | "none";
+export type AccusationStatus = "submitted" | "under_review" | "validated" | "rejected" | "cancelled";
+export type AccusationDecision = "correct" | "incorrect" | "fake_bait_triggered" | "not_receivable" | "cancelled_by_gm";
+export type AccusationVerdict = "reçue" | "irrecevable" | "en arbitrage" | "juste" | "fausse" | "annulée";
 export type GmDecisionType =
   | "validation_override"
   | "accusation_arbitration"
