@@ -32,3 +32,29 @@ Current real catalog convention:
 - active by default (`is_active = true`)
 
 The real catalog currently contains **36** advantage templates.
+
+## Advantage runtime invariants (MVP)
+
+`advantage_templates` remains the catalog definition layer.
+
+`advantage_instances` is runtime-only and starts empty by default:
+- real acquisition source (`shop`, `bonus`, `fake_bait`, `manual`)
+- real paid amount (`cost_paid`)
+- runtime ownership and activation state
+- runtime expiration truth (`expires_at`)
+- runtime consumptions (`remaining_uses`)
+- optional runtime targeting (`target_participant_id`, `target_element_instance_id`)
+
+Identity split is explicit and mandatory:
+- `assigned_player_id` = durable player identity
+- `participant_id` = session incarnation
+
+Expiration hierarchy:
+1. `instance.expires_at` is the runtime truth.
+2. `activated_at + template.duration_seconds` is only a derived helper for validation/audit fallback.
+
+Usage hierarchy:
+- `remaining_uses` is explicit runtime state and is always persisted.
+- `remaining_uses = 0` is a valid business value and must never fallback to template max uses.
+
+Airtable-style lookup/formula fields are not persisted in SQL and must be rebuilt with query helpers/joins.

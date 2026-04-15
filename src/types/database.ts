@@ -1,4 +1,11 @@
-import type { AdvantageEffectFamily, AdvantageTargetType, AdvantageTemplate } from "@/types/domain";
+import type {
+  AdvantageEffectFamily,
+  AdvantageInstance,
+  AdvantageInstanceSource,
+  AdvantageInstanceWithTemplate,
+  AdvantageTargetType,
+  AdvantageTemplate,
+} from "@/types/domain";
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -27,3 +34,36 @@ export type AdvantageTemplateRuntimePatch = {
   effect_family?: AdvantageEffectFamily;
   target_type?: AdvantageTargetType;
 };
+
+export interface AdvantageInstanceRow extends AdvantageInstance {}
+
+export type AdvantageInstanceInsert = Omit<AdvantageInstance, "id" | "created_at" | "updated_at"> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AdvantageInstanceUpdate = Partial<Omit<AdvantageInstanceInsert, "session_id" | "assigned_player_id">>;
+
+export type AdvantageGrantInsert = Omit<
+  AdvantageInstanceInsert,
+  "source" | "cost_paid" | "state" | "remaining_uses" | "activated_at" | "expires_at"
+> & {
+  source: Exclude<AdvantageInstanceSource, "shop">;
+  cost_paid?: number;
+  state?: "owned" | "active";
+  remaining_uses?: number;
+  activated_at?: string | null;
+  expires_at?: string | null;
+};
+
+export type AdvantagePurchaseInsert = Omit<
+  AdvantageInstanceInsert,
+  "source" | "state" | "cost_paid" | "remaining_uses"
+> & {
+  cost_paid: number;
+  remaining_uses: number;
+  state?: "owned";
+};
+
+export type AdvantageInstanceWithTemplateRow = AdvantageInstanceWithTemplate;
