@@ -223,8 +223,40 @@ export interface AdvantageInstanceWithResolvedContext extends AdvantageInstanceW
   target_element_template_name?: string | null;
 }
 export interface Accusation { id: string; session_id: string; accuser_participant_id: string; accused_participant_id: string; adjudicated_by_participant_id?: string | null; suspect_element_type?: ElementType | null; suspect_template_id?: string | null; linked_element_instance_id?: string | null; status: AccusationStatus; decision: AccusationDecision; verdict: AccusationVerdict; justification?: string | null; created_at: string; resolved_at?: string | null; }
-export interface GMDecision { id: string; session_id: string; decision_type: GmDecisionType; status: GmDecisionStatus; made_by_participant_id?: string | null; target_participant_id?: string | null; other_target_participant_id?: string | null; accusation_id?: string | null; element_instance_id?: string | null; target_token_event_id?: string | null; decision_label?: string | null; rationale?: string | null; created_at: string; applied_at?: string | null; }
-export interface ScoreEvent { id: string; session_id: string; participant_id: string; event_type: ScoreEventType; delta: number; source_table?: string | null; source_id?: string | null; created_at: string; }
+export interface GMDecision {
+  id: string;
+  session_id: string;
+  decision_type: GmDecisionType;
+  decision_label: string;
+  reason: string;
+  notes?: string | null;
+  score_impact?: number | null;
+  token_impact?: number | null;
+  is_retroactive: boolean;
+  status: GmDecisionStatus;
+  made_by_participant_id: string;
+  assigned_player_id?: string | null;
+  target_participant_id?: string | null;
+  other_target_participant_id?: string | null;
+  related_element_instance_id?: string | null;
+  target_element_instance_id?: string | null;
+  target_accusation_id?: string | null;
+  target_score_event_id?: string | null;
+  target_token_event_id?: string | null;
+  created_at: string;
+}
+export interface ScoreEvent {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  event_type: ScoreEventType;
+  delta: number;
+  notes?: string | null;
+  related_gm_decision_id?: string | null;
+  source_table?: string | null;
+  source_id?: string | null;
+  created_at: string;
+}
 export interface TokenEvent {
   id: string;
   session_id: string;

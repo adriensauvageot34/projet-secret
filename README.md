@@ -45,6 +45,9 @@ Puis ouvrir `http://localhost:3000`.
 - **Décision humaine explicite**: `gm_decisions` documente, les effets passent par events
 - UTC partout, colonnes en `snake_case` côté SQL
 
+Voir aussi:
+- `docs/gm-decisions.md` pour la couche d'arbitrage GM (décision vs effets ledger).
+
 ## Inclus dans ce MVP
 
 - Arborescence complète Next.js + Tailwind
