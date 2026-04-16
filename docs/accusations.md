@@ -17,6 +17,21 @@
 
 Ces trois champs sont volontairement distincts.
 
+## Convention MVP `is_receivable` (champ miroir)
+
+- `is_receivable` est un miroir métier simple, **pas** une source de vérité autonome.
+- La vérité principale reste le triplet: `status` + `decision` + `verdict`.
+- Convention de lecture:
+  - `NULL` = recevabilité non tranchée (ou annulation GM)
+  - `TRUE` = accusation recevable
+  - `FALSE` = accusation irrecevable
+- Mapping imposé par `decision`:
+  - `correct` -> `is_receivable = true`
+  - `incorrect` -> `is_receivable = true`
+  - `fake_bait_triggered` -> `is_receivable = true`
+  - `not_receivable` -> `is_receivable = false`
+  - `cancelled_by_gm` -> `is_receivable = null`
+
 ## Template vs instance liée
 
 - `suspected_template_id`: l'élément théorique soupçonné (définition catalog).
