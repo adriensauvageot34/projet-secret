@@ -103,6 +103,7 @@ function makeDeps(input?: {
   const calls = { atomic: 0 };
 
   const deps: PurchaseAdvantageDeps = {
+    assertSessionIsLiveByIdEntry: async () => undefined,
     loadParticipant: async () => input?.participant ?? makeParticipant(),
     loadTemplate: async () => input?.template ?? makeTemplate(),
     loadLevelById: async () => input?.levelById ?? makeLevel(),
