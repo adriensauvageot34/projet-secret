@@ -26,6 +26,12 @@ const AUTOMATIC_EFFECT_CODES = new Set([
   "reduce_other_mission_timer",
   "double_other_constraint_timer",
 ]);
+const PLAYER_ACTIVATION_EFFECT_CODES = new Set([
+  "free_skip",
+  "cancel_skip_penalty",
+  "next_correct_accusation_bonus_3",
+  "double_next_mission_value",
+]);
 
 function getElementTargetFilter(effectCode: string, selfParticipantId: string) {
   if (effectCode === "halve_slot_cooldown" || effectCode === "unlock_slot_now" || effectCode === "accelerate_slot_unlock") {
@@ -92,6 +98,7 @@ export function InventoryPanel({
             const isGmTicket = isGmTicketEffectCode(item.template.effect_code);
             const isTargetRequired = isGmTicketParticipantTargetRequired(item.template.effect_code);
             const isAutomaticEffect = AUTOMATIC_EFFECT_CODES.has(item.template.effect_code);
+            const isPlayerActivable = PLAYER_ACTIVATION_EFFECT_CODES.has(item.template.effect_code);
             const selectedTarget = targetByInstanceId[item.id] ?? defaultTargetId;
             const compatibleElementTargets = elementTargets.filter(
               getElementTargetFilter(item.template.effect_code, selfParticipantId),
@@ -104,10 +111,13 @@ export function InventoryPanel({
               <div key={item.id} className="space-y-2 rounded border border-slate-700 p-2">
                 <p className="text-sm font-medium text-slate-100">{item.template.name}</p>
                 <p>{item.template.description_player}</p>
-                <p>état: {toPlayerAdvantageStateLabel(item.state, isGmTicket)} · utilisations: {item.remaining_uses}</p>
+                <p>état: {toPlayerAdvantageStateLabel(item.state, isGmTicket, item.template.effect_code)} · utilisations: {item.remaining_uses}</p>
                 <p>coût payé: {item.cost_paid} · créé le: {formatDate(item.created_at)}</p>
                 <p>activé le: {formatDate(item.activated_at)}</p>
                 <p>cible: {item.target_participant_id ? targets.find((target) => target.id === item.target_participant_id)?.displayName ?? "participant" : "—"}</p>
+                {item.state === "active" && isPlayerActivable ? (
+                  <p className="text-emerald-300">En attente de déclenchement automatique sur le prochain événement compatible.</p>
+                ) : null}
 
                 {isGmTicket && item.state === "owned" ? (
                   <div className="space-y-2">
@@ -194,6 +204,20 @@ export function InventoryPanel({
                     })}
                   >
                     {isBusy ? "Application…" : "Appliquer maintenant"}
+                  </Button>
+                ) : null}
+
+                {isPlayerActivable && item.state === "owned" ? (
+                  <Button
+                    className="py-1 text-xs"
+                    disabled={isBusy}
+                    onClick={() => void onActivateAdvantage({
+                      advantageInstanceId: item.id,
+                      targetParticipantId: null,
+                      targetElementInstanceId: null,
+                    })}
+                  >
+                    {isBusy ? "Activation…" : "Armer l’avantage"}
                   </Button>
                 ) : null}
               </div>

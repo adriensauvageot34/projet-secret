@@ -23,6 +23,7 @@ import {
 } from "@/lib/game/rules/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { validateAdvantageTargeting } from "@/lib/game/rules/advantage-targeting";
+import { compensateLatestSkipPenalty, getLatestCompensableSkipPenalty } from "@/lib/game/services/armed-advantages";
 import type { AdvantageInstance, AdvantageTemplate } from "@/types/domain";
 import type { Level, Participant } from "@/types/domain";
 
@@ -231,12 +232,30 @@ export async function activateParticipantAdvantage(input: {
     input.forcedExpiresAt ??
     computeAdvantageTheoreticalExpiresAt(activatedAt, instance.template.duration_seconds);
 
-  return activateAdvantageInstance(instance.id, {
+  if (instance.template.effect_code === "cancel_skip_penalty") {
+    const latestSkipPenalty = await getLatestCompensableSkipPenalty(instance.participant_id);
+
+    if (!latestSkipPenalty) {
+      throw new Error("Aucun malus de skip à compenser pour le moment.");
+    }
+  }
+
+  const activated = await activateAdvantageInstance(instance.id, {
     activated_at: activatedAt.toISOString(),
     expires_at: expiresAt ? expiresAt.toISOString() : null,
     target_participant_id: input.targetParticipantId ?? null,
     target_element_instance_id: input.targetElementInstanceId ?? null,
   });
+
+  if (instance.template.effect_code === "cancel_skip_penalty") {
+    await compensateLatestSkipPenalty({
+      advantageInstanceId: activated.id,
+      participantId: activated.participant_id,
+      sessionId: activated.session_id,
+    });
+  }
+
+  return activated;
 }
 
 export async function applyAdvantageUse(input: {

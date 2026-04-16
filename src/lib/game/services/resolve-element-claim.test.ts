@@ -122,6 +122,7 @@ function makeDeps(params: {
         updateParticipantLevelCalls += 1;
         return null;
       },
+      consumeFirstArmedAdvantage: async (_input: { participantId: string; effectCode: string }) => null,
       now: () => new Date(params.nowIso ?? "2026-01-01T00:05:00.000Z"),
     },
   };
@@ -248,6 +249,48 @@ test("activation puis skipped => état cooldown + score_event penalty", async ()
     },
   ]);
   assert.deepEqual(updateComboCalls, [false]);
+});
+
+test("buff armé free_skip: neutralise uniquement le prochain skip_penalty puis se consomme", async () => {
+  let armedCalls = 0;
+  const { deps, createScoreEventCalls, updateComboCalls } = makeDeps({
+    claimResult: "skipped",
+    validationMode: "gm",
+    templateBasePoints: 2,
+  });
+  deps.consumeFirstArmedAdvantage = async ({ effectCode }: { participantId: string; effectCode: string }) => {
+    if (effectCode === "free_skip") {
+      armedCalls += 1;
+      return { id: "adv-free" } as never;
+    }
+    return null;
+  };
+
+  const result = await resolveElementClaim("instance-1", "skipped", deps);
+
+  assert.equal(result.finalResolved, true);
+  assert.equal(armedCalls, 1);
+  assert.deepEqual(createScoreEventCalls, []);
+  assert.deepEqual(updateComboCalls, [false]);
+});
+
+test("buff armé double_next_mission_value: ajoute un bonus score égal à la valeur de base", async () => {
+  const { deps, createScoreEventCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    templateElementType: "mission",
+    templateBasePoints: 3,
+  });
+
+  deps.consumeFirstArmedAdvantage = async ({ effectCode }: { participantId: string; effectCode: string }) =>
+    effectCode === "double_next_mission_value" ? ({ id: "adv-double" } as never) : null;
+
+  await resolveElementClaim("instance-1", "success", deps);
+
+  assert.deepEqual(createScoreEventCalls.map((call) => [call.eventType, call.deltaPoints]), [
+    ["mission_success", 3],
+    ["manual_adjustment", 3],
+  ]);
 });
 
 test("skip trop tôt => refusé avant skip_available_at", async () => {
