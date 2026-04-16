@@ -4,6 +4,7 @@ import {
   assertMadeByParticipantSession,
   assertSameSession,
   computeNextDecisionStatus,
+  deriveLedgerEffectsPlan,
   resolveTargetParticipantForImpacts,
   validateGMDecisionBusinessRules,
 } from "@/lib/game/services/gm-decisions";
@@ -49,6 +50,22 @@ test("validation: manual_bonus and manual_penalty enforce impact signs", () => {
     }),
   );
 
+  assert.throws(() =>
+    validateGMDecisionBusinessRules({
+      decisionType: "manual_bonus",
+      scoreImpact: -2,
+      tokenImpact: 0,
+      isRetroactive: false,
+      targetAccusationId: null,
+      relatedElementInstanceId: null,
+      targetElementInstanceId: null,
+      targetParticipantId: "00000000-0000-0000-0000-000000000001",
+      otherTargetParticipantId: null,
+      targetScoreEventId: null,
+      targetTokenEventId: null,
+    }),
+  );
+
   assert.doesNotThrow(() =>
     validateGMDecisionBusinessRules({
       decisionType: "manual_bonus",
@@ -58,7 +75,7 @@ test("validation: manual_bonus and manual_penalty enforce impact signs", () => {
       targetAccusationId: null,
       relatedElementInstanceId: null,
       targetElementInstanceId: null,
-      targetParticipantId: null,
+      targetParticipantId: "00000000-0000-0000-0000-000000000001",
       otherTargetParticipantId: null,
       targetScoreEventId: null,
       targetTokenEventId: null,
@@ -74,7 +91,23 @@ test("validation: manual_bonus and manual_penalty enforce impact signs", () => {
       targetAccusationId: null,
       relatedElementInstanceId: null,
       targetElementInstanceId: null,
-      targetParticipantId: null,
+      targetParticipantId: "00000000-0000-0000-0000-000000000001",
+      otherTargetParticipantId: null,
+      targetScoreEventId: null,
+      targetTokenEventId: null,
+    }),
+  );
+
+  assert.doesNotThrow(() =>
+    validateGMDecisionBusinessRules({
+      decisionType: "manual_bonus",
+      scoreImpact: 0,
+      tokenImpact: 2,
+      isRetroactive: false,
+      targetAccusationId: null,
+      relatedElementInstanceId: null,
+      targetElementInstanceId: null,
+      targetParticipantId: "00000000-0000-0000-0000-000000000001",
       otherTargetParticipantId: null,
       targetScoreEventId: null,
       targetTokenEventId: null,
@@ -161,6 +194,117 @@ test("validation: decision-type specific targeting constraints", () => {
       targetScoreEventId: null,
       targetTokenEventId: null,
     }),
+  );
+});
+
+function makeDecisionForPlan(overrides: Partial<Parameters<typeof deriveLedgerEffectsPlan>[0]> = {}): Parameters<typeof deriveLedgerEffectsPlan>[0] {
+  return {
+    id: "00000000-0000-0000-0000-000000000900",
+    score_impact: 3,
+    token_impact: 0,
+    target_participant_id: "00000000-0000-0000-0000-000000000001",
+    produced_score_events: [],
+    produced_token_events: [],
+    ...overrides,
+  };
+}
+
+test("apply plan: manual_bonus score creates score ledger once", () => {
+  const plan = deriveLedgerEffectsPlan(
+    makeDecisionForPlan({
+      score_impact: 4,
+      token_impact: 0,
+    }),
+  );
+
+  assert.equal(plan.shouldCreateScoreEvent, true);
+  assert.equal(plan.shouldCreateTokenEvent, false);
+});
+
+test("apply plan: manual_penalty score creates score ledger once", () => {
+  const plan = deriveLedgerEffectsPlan(
+    makeDecisionForPlan({
+      score_impact: -2,
+      token_impact: 0,
+    }),
+  );
+
+  assert.equal(plan.shouldCreateScoreEvent, true);
+  assert.equal(plan.shouldCreateTokenEvent, false);
+});
+
+test("apply plan: bonus token creates token ledger once", () => {
+  const plan = deriveLedgerEffectsPlan(
+    makeDecisionForPlan({
+      score_impact: 0,
+      token_impact: 2,
+    }),
+  );
+
+  assert.equal(plan.shouldCreateScoreEvent, false);
+  assert.equal(plan.shouldCreateTokenEvent, true);
+});
+
+test("apply plan: decision applied twice does not request duplicate ledger", () => {
+  const plan = deriveLedgerEffectsPlan(
+    makeDecisionForPlan({
+      score_impact: 3,
+      produced_score_events: [
+        {
+          id: "00000000-0000-0000-0000-000000000901",
+          session_id: "00000000-0000-0000-0000-000000000010",
+          participant_id: "00000000-0000-0000-0000-000000000001",
+          event_type: "manual_adjustment",
+          delta_points: 3,
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    }),
+  );
+
+  assert.equal(plan.shouldCreateScoreEvent, false);
+  assert.equal(plan.shouldCreateTokenEvent, false);
+});
+
+test("apply plan: cancel-related status transition and cancelled guard", () => {
+  assert.equal(computeNextDecisionStatus("logged", "cancel"), "cancelled");
+  assert.throws(() => computeNextDecisionStatus("cancelled", "apply"));
+});
+
+test("apply plan: rejects incoherent target and duplicate ledger replay", () => {
+  assert.throws(() =>
+    deriveLedgerEffectsPlan(
+      makeDecisionForPlan({
+        target_participant_id: null,
+        score_impact: 2,
+      }),
+    ),
+  );
+
+  assert.throws(() =>
+    deriveLedgerEffectsPlan(
+      makeDecisionForPlan({
+        score_impact: 3,
+        produced_score_events: [
+          {
+            id: "00000000-0000-0000-0000-000000000901",
+            session_id: "00000000-0000-0000-0000-000000000010",
+            participant_id: "00000000-0000-0000-0000-000000000001",
+            event_type: "manual_adjustment",
+            delta_points: 3,
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "00000000-0000-0000-0000-000000000902",
+            session_id: "00000000-0000-0000-0000-000000000010",
+            participant_id: "00000000-0000-0000-0000-000000000001",
+            event_type: "manual_adjustment",
+            delta_points: 3,
+            created_at: "2026-01-01T00:00:01.000Z",
+          },
+        ],
+      }),
+    ),
   );
 });
 
