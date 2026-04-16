@@ -33,6 +33,45 @@ type PurchaseContext = {
   levelNumber: number;
 };
 
+function assertAtomicPurchaseResult(
+  instance: AdvantageInstance,
+  context: Pick<PurchaseContext, "participant" | "template">,
+): AdvantageInstance {
+  if (instance.source !== "shop") {
+    throw new Error("Atomic shop purchase returned non-shop source");
+  }
+
+  if (instance.state !== "owned") {
+    throw new Error("Atomic shop purchase must create an owned advantage instance");
+  }
+
+  if (instance.participant_id !== context.participant.id) {
+    throw new Error("Atomic shop purchase returned an instance linked to another participant");
+  }
+
+  if (instance.session_id !== context.participant.session_id) {
+    throw new Error("Atomic shop purchase returned an instance linked to another session");
+  }
+
+  if (instance.assigned_player_id !== context.participant.player_id) {
+    throw new Error("Atomic shop purchase returned an instance linked to another assigned player");
+  }
+
+  if (instance.advantage_template_id !== context.template.id) {
+    throw new Error("Atomic shop purchase returned an instance for another template");
+  }
+
+  if (instance.cost_paid !== context.template.cost_tokens) {
+    throw new Error("Atomic shop purchase returned incoherent cost_paid");
+  }
+
+  if (instance.target_participant_id !== null || instance.target_element_instance_id !== null) {
+    throw new Error("Atomic shop purchase should not set targets on owned inventory instance");
+  }
+
+  return instance;
+}
+
 export type PurchaseAdvantageDeps = {
   loadParticipant: (participantId: string) => Promise<Participant | null>;
   loadTemplate: (templateId: string) => Promise<AdvantageTemplate | null>;
@@ -152,7 +191,8 @@ export async function purchaseAdvantageForParticipant(input: {
     throw new Error(`Cannot purchase advantage: ${purchaseCheck.reasons.join(", ")}`);
   }
 
-  return deps.runAtomicPurchase(input);
+  const instance = await deps.runAtomicPurchase(input);
+  return assertAtomicPurchaseResult(instance, context);
 }
 
 export async function activateParticipantAdvantage(input: {

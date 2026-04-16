@@ -244,3 +244,26 @@ test("anti demi-achat: la mutation comptable est unique et atomique côté servi
 
   assert.equal(calls.atomic, 1);
 });
+
+test("garde-fou: rejette une réponse atomique incohérente (instance liée à un autre participant)", async () => {
+  const { deps, calls } = makeDeps({
+    runAtomicPurchase: async () =>
+      makeInstance({
+        participant_id: "00000000-0000-0000-0000-000000000999",
+      }),
+  });
+
+  await assert.rejects(
+    () =>
+      purchaseAdvantageForParticipant(
+        {
+          templateId: "00000000-0000-0000-0000-000000000501",
+          participantId: "00000000-0000-0000-0000-000000000101",
+        },
+        deps,
+      ),
+    /another participant/,
+  );
+
+  assert.equal(calls.atomic, 1);
+});

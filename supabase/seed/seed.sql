@@ -6270,8 +6270,14 @@ set
   display_name = excluded.display_name,
   role = excluded.role,
   current_status = excluded.current_status,
+  current_score = excluded.current_score,
+  current_tokens = excluded.current_tokens,
+  combo_streak_current = excluded.combo_streak_current,
   mission_slot_max = excluded.mission_slot_max,
   constraint_slot_max = excluded.constraint_slot_max,
+  completed_elements_count = excluded.completed_elements_count,
+  waiting_slot_count = excluded.waiting_slot_count,
+  blocked_slot_count = excluded.blocked_slot_count,
   updated_at = timezone('utc', now());
 
 update sessions s

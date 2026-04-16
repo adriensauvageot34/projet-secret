@@ -28,6 +28,17 @@ npm run dev
 Puis ouvrir `http://localhost:3000`.
 
 
+
+## Vérifications mécaniques MVP
+
+```bash
+npm run test
+npm run check:mvp
+```
+
+- `npm run test`: exécute les tests unitaires des services métier MVP (`src/lib/game/services/*.test.ts`).
+- `npm run check:mvp`: enchaîne typecheck + lint + tests pour valider rapidement les flux critiques du moteur.
+
 ## Liaison Supabase CLI (projet distant)
 
 Préparer le link (sans push de migration):

@@ -40,7 +40,7 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
         successMessage={runtime.successMessage}
         actionError={runtime.actionError}
       />
-      <PlayerRankStrip level={runtime.runtime.level} />
+      <PlayerRankStrip level={runtime.runtime.level} ranking={runtime.runtime.ranking} />
       <ActiveElementsPanel
         activeElements={runtime.runtime.activeElements}
         pendingInstanceId={runtime.pendingInstanceId}

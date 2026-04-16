@@ -260,6 +260,15 @@ export async function createGMDecision(input: CreateGMDecisionInput): Promise<GM
   return detail;
 }
 
+function isDuplicateLedgerEventError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("duplicate key") || message.includes("unique constraint");
+}
+
 async function applyScoreImpact(decision: GMDecision, appliedAt: Date): Promise<void> {
   const delta = decision.score_impact ?? 0;
 
@@ -271,15 +280,21 @@ async function applyScoreImpact(decision: GMDecision, appliedAt: Date): Promise<
     throw new Error("Cannot apply score impact without target_participant_id");
   }
 
-  await createScoreEvent({
-    participantId: decision.target_participant_id,
-    sessionId: decision.session_id,
-    eventType: "manual_adjustment",
-    deltaPoints: delta,
-    notes: `GM decision ${decision.id}: ${decision.decision_label}`,
-    relatedGmDecisionId: decision.id,
-    createdAt: appliedAt,
-  });
+  try {
+    await createScoreEvent({
+      participantId: decision.target_participant_id,
+      sessionId: decision.session_id,
+      eventType: "manual_adjustment",
+      deltaPoints: delta,
+      notes: `GM decision ${decision.id}: ${decision.decision_label}`,
+      relatedGmDecisionId: decision.id,
+      createdAt: appliedAt,
+    });
+  } catch (error) {
+    if (!isDuplicateLedgerEventError(error)) {
+      throw error;
+    }
+  }
 
 }
 
@@ -294,15 +309,21 @@ async function applyTokenImpact(decision: GMDecision, appliedAt: Date): Promise<
     throw new Error("Cannot apply token impact without target_participant_id");
   }
 
-  await createTokenEvent({
-    participantId: decision.target_participant_id,
-    sessionId: decision.session_id,
-    eventType: "manual_adjustment",
-    deltaTokens,
-    notes: `GM decision ${decision.id}: ${decision.decision_label}`,
-    createdAt: appliedAt,
-    relatedGmDecisionId: decision.id,
-  });
+  try {
+    await createTokenEvent({
+      participantId: decision.target_participant_id,
+      sessionId: decision.session_id,
+      eventType: "manual_adjustment",
+      deltaTokens,
+      notes: `GM decision ${decision.id}: ${decision.decision_label}`,
+      createdAt: appliedAt,
+      relatedGmDecisionId: decision.id,
+    });
+  } catch (error) {
+    if (!isDuplicateLedgerEventError(error)) {
+      throw error;
+    }
+  }
 }
 
 export async function applyGMDecision(input: ApplyGMDecisionInput): Promise<GMDecisionDetail> {

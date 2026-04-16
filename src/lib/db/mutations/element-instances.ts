@@ -71,10 +71,15 @@ export async function claimResult(instanceId: string, claimedResult: ClaimedResu
     .from("element_instances")
     .update({ claimed_result: claimedResult })
     .eq("id", instanceId)
+    .is("final_result", null)
     .select("*")
     .single();
 
-  return assertSingleRow(data as ElementInstance | null, error, "Failed to claim element result");
+  return assertSingleRow(
+    data as ElementInstance | null,
+    error,
+    "Failed to claim element result (already terminally resolved or not found)",
+  );
 }
 
 export async function submitProof(instanceId: string): Promise<ElementInstance> {
@@ -83,10 +88,17 @@ export async function submitProof(instanceId: string): Promise<ElementInstance> 
     .from("element_instances")
     .update({ proof_status: "provided" })
     .eq("id", instanceId)
+    .eq("state", "active")
+    .eq("proof_status", "pending")
+    .is("final_result", null)
     .select("*")
     .single();
 
-  return assertSingleRow(data as ElementInstance | null, error, "Failed to submit proof");
+  return assertSingleRow(
+    data as ElementInstance | null,
+    error,
+    "Failed to submit proof (instance not pending, already resolved, or not found)",
+  );
 }
 
 export async function denyProof(instanceId: string): Promise<ElementInstance> {
@@ -123,10 +135,11 @@ export async function resolveElement(
     .from("element_instances")
     .update(updatePayload)
     .eq("id", instanceId)
+    .is("final_result", null)
     .select("*")
     .single();
 
-  return assertSingleRow(data as ElementInstance | null, error, "Failed to resolve element");
+  return assertSingleRow(data as ElementInstance | null, error, "Failed to resolve element (already resolved or not found)");
 }
 
 export async function expireElement(instanceId: string): Promise<ElementInstance | null> {

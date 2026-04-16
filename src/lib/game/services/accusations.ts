@@ -144,6 +144,19 @@ function assertTemplateMatchesSuspectedType(template: Pick<ElementTemplate, "ele
   }
 }
 
+function assertRelatedInstanceMatchesAccusation(
+  instance: Pick<ElementInstance, "participant_id" | "element_template_id">,
+  input: Pick<CreateAccusationInput, "accusedParticipantId" | "suspectedTemplateId">,
+): void {
+  if (instance.participant_id !== input.accusedParticipantId) {
+    throw new Error("related_element_instance_id must target an element instance owned by accused_participant_id");
+  }
+
+  if (instance.element_template_id !== input.suspectedTemplateId) {
+    throw new Error("related_element_instance_id must match suspected_template_id");
+  }
+}
+
 async function loadParticipant(participantId: string): Promise<Participant> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase.from("participants").select("*").eq("id", participantId).maybeSingle();
@@ -191,6 +204,21 @@ async function loadElementInstance(instanceId: string): Promise<ElementInstance>
 
 function isFinalStatus(status: AccusationStatus): boolean {
   return status === "validated" || status === "rejected" || status === "cancelled";
+}
+
+function assertAdjudicatorRole(participant: Pick<Participant, "role">): void {
+  if (participant.role !== "gm") {
+    throw new Error("adjudicated_by_participant_id must reference a GM participant");
+  }
+}
+
+function isDuplicateTokenRewardError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("duplicate key") || message.includes("unique constraint");
 }
 
 async function createArbitrationDecisionRecord(params: {
@@ -281,6 +309,7 @@ export async function createAccusation(input: CreateAccusationInput, deps: Creat
   if (payload.relatedElementInstanceId) {
     const relatedInstance = await deps.loadElementInstanceById(payload.relatedElementInstanceId);
     assertSameSession(relatedInstance, payload.sessionId, "related_element_instance");
+    assertRelatedInstanceMatchesAccusation(relatedInstance, payload);
   }
 
   const created = await deps.createAccusationRow({
@@ -360,6 +389,7 @@ export async function adjudicateAccusation(
 
   const adjudicator = await deps.loadParticipantById(payload.adjudicatedByParticipantId);
   assertSameSession(adjudicator, payload.sessionId, "adjudicated_by_participant");
+  assertAdjudicatorRole(adjudicator);
 
   if (isFinalStatus(accusation.status)) {
     if (accusation.decision === payload.decision) {
@@ -394,21 +424,31 @@ export async function adjudicateAccusation(
     const alreadyRewarded = await deps.hasAccusationCorrectRewardTokenEventEntry(accusation.id);
 
     if (!alreadyRewarded) {
-      await deps.createTokenEventEntry({
-        participantId: accusation.accuser_participant_id,
-        sessionId: accusation.session_id,
-        eventType: "accusation_correct",
-        deltaTokens: rewardTokens,
-        relatedAccusationId: accusation.id,
-        notes: payload.notesAdmin ?? "Accusation correcte",
-        createdAt: payload.adjudicatedAt,
-      });
+      try {
+        await deps.createTokenEventEntry({
+          participantId: accusation.accuser_participant_id,
+          sessionId: accusation.session_id,
+          eventType: "accusation_correct",
+          deltaTokens: rewardTokens,
+          relatedAccusationId: accusation.id,
+          notes: payload.notesAdmin ?? "Accusation correcte",
+          createdAt: payload.adjudicatedAt,
+        });
+      } catch (error) {
+        if (!isDuplicateTokenRewardError(error)) {
+          throw error;
+        }
+      }
     }
   }
 
   if (payload.decision === "fake_bait_triggered") {
-    const bonusTokens = payload.fakeBaitBonusTokens ?? 1;
-    const bonusScore = payload.fakeBaitBonusScore ?? 0;
+    if (!accusation.related_element_is_fake) {
+      throw new Error("fake_bait_triggered requires a related fake element accusation");
+    }
+
+    const bonusTokens = payload.fakeBaitBonusTokens ?? 2;
+    const bonusScore = payload.fakeBaitBonusScore ?? 5;
 
     if (bonusTokens > 0) {
       await deps.createTokenEventEntry({

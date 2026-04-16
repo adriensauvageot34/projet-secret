@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
 import { listElementInstancesByParticipant } from "@/lib/db/queries/element-instances";
@@ -6,6 +7,22 @@ import { getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
+import { buildVisibleReserveTemplates } from "@/lib/game/services/reserve-templates";
+import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
+
+async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participants")
+    .select("id, display_name, current_score, current_tokens")
+    .eq("session_id", sessionId);
+
+  if (error) {
+    throw new Error(`Failed to load session ranking participants: ${error.message}`);
+  }
+
+  return (data ?? []) as RankingParticipant[];
+}
 
 export async function GET(_request: Request, context: { params: { participantId: string } }) {
   try {
@@ -23,11 +40,12 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
       getVisibleShopTemplatesForLevel(level.level_number),
+      listSessionRankingParticipants(participant.session_id),
     ]);
 
     const templatesById = new Map(templatesForLevel.map((template) => [template.id, template]));
@@ -51,17 +69,15 @@ export async function GET(_request: Request, context: { params: { participantId:
         };
       });
 
-    const reserveTemplates = templatesForLevel
-      .filter((template) => template.can_appear_in_reserve && template.is_active)
-      .map((template) => ({
-        id: template.id,
-        name: template.name,
-        code: template.code,
-        elementType: template.element_type,
-        difficulty: template.difficulty,
-        durationSeconds: template.duration_seconds,
-        validationMode: template.validation_mode,
-      }));
+    const reserveTemplates = buildVisibleReserveTemplates(templatesForLevel, level).map((template) => ({
+      id: template.id,
+      name: template.name,
+      code: template.code,
+      elementType: template.element_type,
+      difficulty: template.difficulty,
+      durationSeconds: template.duration_seconds,
+      validationMode: template.validation_mode,
+    }));
 
     const shop = shopTemplates.map((template) => {
       const check = canParticipantBuyAdvantage(
@@ -78,6 +94,13 @@ export async function GET(_request: Request, context: { params: { participantId:
       };
     });
 
+    const ranking = buildLiveRanking(rankingParticipants);
+    const localRanking = buildLocalRankingWindow(ranking, participant.id);
+
+    if (!localRanking) {
+      throw new Error("Participant missing from session ranking");
+    }
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -92,6 +115,11 @@ export async function GET(_request: Request, context: { params: { participantId:
         activeElements,
         shop,
         inventory,
+        ranking: {
+          self: localRanking.self,
+          above: localRanking.above,
+          below: localRanking.below,
+        },
       },
     });
   } catch (error) {

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx --test src/lib/game/services/*.test.ts",
+    "check:mvp": "npm run typecheck && npm run lint && npm run test",
     "typecheck": "tsc --noEmit",
     "check:env": "tsx scripts/check-env.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",

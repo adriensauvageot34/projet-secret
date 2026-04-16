@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import type { TokenEvent } from "@/types/domain";
 import { enrichTokenEventRow } from "@/lib/db/queries/token-events";
 import { assertEventTypeDeltaConsistency } from "@/lib/game/services/token-events";
@@ -71,4 +72,12 @@ test("manual_adjustment and cancellation allow both signs", () => {
   assert.doesNotThrow(() => assertEventTypeDeltaConsistency("manual_adjustment", 3));
   assert.doesNotThrow(() => assertEventTypeDeltaConsistency("cancellation", -1));
   assert.doesNotThrow(() => assertEventTypeDeltaConsistency("cancellation", 1));
+});
+
+test("cohérence ledger-first: createTokenEvent réconcilie current_tokens depuis token_events", () => {
+  const tokenEventsService = readFileSync("src/lib/game/services/token-events.ts", "utf8");
+
+  assert.match(tokenEventsService, /export async function computeParticipantTokensFromLedger/);
+  assert.match(tokenEventsService, /export async function reconcileParticipantCurrentTokens/);
+  assert.equal(tokenEventsService.includes("await reconcileParticipantCurrentTokens(payload.participantId);"), true);
 });

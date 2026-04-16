@@ -85,7 +85,34 @@ async function assertRelatedRecordSession(table: "accusations" | "advantage_inst
   }
 }
 
-async function validateCreateInput(payload: CreateTokenEventPayload): Promise<{ nextTokens: number }> {
+export async function computeParticipantTokensFromLedger(participantId: string): Promise<number> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("token_events")
+    .select("delta_tokens")
+    .eq("participant_id", participantId);
+
+  if (error) {
+    throw new Error(`Failed to compute ledger tokens for participant ${participantId}: ${error.message}`);
+  }
+
+  return ((data ?? []) as Pick<TokenEvent, "delta_tokens">[]).reduce((total, row) => total + row.delta_tokens, 0);
+}
+
+export async function reconcileParticipantCurrentTokens(participantId: string): Promise<number> {
+  const ledgerTotal = await computeParticipantTokensFromLedger(participantId);
+
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.from("participants").update({ current_tokens: ledgerTotal }).eq("id", participantId);
+
+  if (error) {
+    throw new Error(`Failed to reconcile participant.current_tokens: ${error.message}`);
+  }
+
+  return ledgerTotal;
+}
+
+async function validateCreateInput(payload: CreateTokenEventPayload): Promise<void> {
   assertEventTypeDeltaConsistency(payload.eventType, payload.deltaTokens);
 
   const supabase = createServerSupabaseClient();
@@ -129,12 +156,12 @@ async function validateCreateInput(payload: CreateTokenEventPayload): Promise<{ 
     throw new Error("Token event would make participant.current_tokens negative");
   }
 
-  return { nextTokens };
+  return;
 }
 
 export async function createTokenEvent(input: CreateTokenEventInput) {
   const payload = createTokenEventSchema.parse(input);
-  const { nextTokens } = await validateCreateInput(payload);
+  await validateCreateInput(payload);
 
   const supabase = createServerSupabaseClient();
   const createdAt = toUtcISOString(payload.createdAt);
@@ -160,14 +187,7 @@ export async function createTokenEvent(input: CreateTokenEventInput) {
     throw new Error(`Failed to create token event: ${error?.message ?? "unknown error"}`);
   }
 
-  const { error: participantUpdateError } = await supabase
-    .from("participants")
-    .update({ current_tokens: nextTokens })
-    .eq("id", payload.participantId);
-
-  if (participantUpdateError) {
-    throw new Error(`Failed to update participant.current_tokens: ${participantUpdateError.message}`);
-  }
+  await reconcileParticipantCurrentTokens(payload.participantId);
 
   const enriched = await getTokenEventById((data as TokenEvent).id);
 

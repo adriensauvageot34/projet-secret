@@ -19,6 +19,7 @@ const session = {
 
 const level = {
   id: "level-1",
+  level_number: 1,
   mission_difficulty_max: 2,
   constraint_difficulty_max: 1,
 } as const;
@@ -33,6 +34,24 @@ const missionTemplate = {
   is_active: true,
   can_appear_in_reserve: true,
   can_be_fake: false,
+} as const;
+
+const constraintTemplate = {
+  id: "template-constraint",
+  element_type: "constraint",
+  difficulty: 1,
+  duration_seconds: 125,
+  skip_unlock_rule: "one_third",
+  proof_required: false,
+  is_active: true,
+  can_appear_in_reserve: true,
+  can_be_fake: false,
+} as const;
+
+const oneHalfTemplate = {
+  ...missionTemplate,
+  id: "template-one-half",
+  skip_unlock_rule: "one_half",
 } as const;
 
 function makeInstance(overrides: Partial<ElementInstance> = {}): ElementInstance {
@@ -69,7 +88,7 @@ test("buildActivationPlan calcule timestamps et slot auto", () => {
     session,
     template: missionTemplate,
     level,
-    activeSlots: [{ active_slot_index: 0 }],
+    occupiedSlots: [{ active_slot_index: 0, state: "active", cooldown_until: null }],
     isFake: false,
     now,
   });
@@ -81,6 +100,22 @@ test("buildActivationPlan calcule timestamps et slot auto", () => {
   assert.equal(plan.proofStatus, "not_required");
 });
 
+test("buildActivationPlan respecte skip_unlock_rule one_half", () => {
+  const now = new Date("2026-01-01T00:00:00.000Z");
+
+  const plan = buildActivationPlan({
+    participant,
+    session,
+    template: oneHalfTemplate,
+    level,
+    occupiedSlots: [],
+    isFake: false,
+    now,
+  });
+
+  assert.equal(plan.skipAvailableAt, "2026-01-01T00:01:03.000Z");
+});
+
 test("activateElement refuse quand tous les slots sont occupés", async () => {
   await assert.rejects(
     () =>
@@ -89,7 +124,10 @@ test("activateElement refuse quand tous les slots sont occupés", async () => {
         loadSession: async () => ({ ...session }),
         loadTemplate: async () => ({ ...missionTemplate }),
         loadLevel: async () => ({ ...level }),
-        listActiveSlots: async () => [{ active_slot_index: 0 }, { active_slot_index: 1 }],
+        listOccupiedSlots: async () => [
+          { active_slot_index: 0, state: "active", cooldown_until: null },
+          { active_slot_index: 1, state: "active", cooldown_until: null },
+        ],
         createInstance: async () => makeInstance(),
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
@@ -105,7 +143,7 @@ test("activateElement refuse un template inactif", async () => {
         loadSession: async () => ({ ...session }),
         loadTemplate: async () => ({ ...missionTemplate, is_active: false }),
         loadLevel: async () => ({ ...level }),
-        listActiveSlots: async () => [],
+        listOccupiedSlots: async () => [],
         createInstance: async () => makeInstance(),
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
@@ -121,7 +159,7 @@ test("activateElement refuse un template non éligible au niveau", async () => {
         loadSession: async () => ({ ...session }),
         loadTemplate: async () => ({ ...missionTemplate, difficulty: 3 }),
         loadLevel: async () => ({ ...level }),
-        listActiveSlots: async () => [],
+        listOccupiedSlots: async () => [],
         createInstance: async () => makeInstance(),
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
@@ -129,13 +167,93 @@ test("activateElement refuse un template non éligible au niveau", async () => {
   );
 });
 
+test("activateElement impose un plafond MVP de 2 slots missions", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "template-1", undefined, false, {
+        loadParticipant: async () => ({ ...participant, mission_slot_max: 4 }),
+        loadSession: async () => ({ ...session, max_active_missions: 4 }),
+        loadTemplate: async () => ({ ...missionTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [
+          { active_slot_index: 0, state: "active", cooldown_until: null },
+          { active_slot_index: 1, state: "active", cooldown_until: null },
+        ],
+        createInstance: async () => makeInstance(),
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /No free slot available for activation/,
+  );
+});
+
+test("activateElement refuse si les 2 slots contraintes sont occupés", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "template-constraint", undefined, false, {
+        loadParticipant: async () => ({ ...participant, constraint_slot_max: 3 }),
+        loadSession: async () => ({ ...session, max_active_constraints: 3 }),
+        loadTemplate: async () => ({ ...constraintTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [
+          { active_slot_index: 0, state: "active", cooldown_until: null },
+          { active_slot_index: 1, state: "active", cooldown_until: null },
+        ],
+        createInstance: async () => makeInstance(),
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /No free slot available for activation/,
+  );
+});
+
+test("activateElement bloque un slot en cooldown non expiré", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "template-1", undefined, false, {
+        loadParticipant: async () => ({ ...participant }),
+        loadSession: async () => ({ ...session }),
+        loadTemplate: async () => ({ ...missionTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [
+          { active_slot_index: 0, state: "cooldown", cooldown_until: "2026-01-01T00:10:00.000Z" },
+          { active_slot_index: 1, state: "active", cooldown_until: null },
+        ],
+        createInstance: async () => makeInstance(),
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /No free slot available for activation/,
+  );
+});
+
+test("activateElement autorise un slot dont le cooldown est expiré", async () => {
+  const result = await activateElement("participant-1", "template-1", undefined, false, {
+    loadParticipant: async () => ({ ...participant }),
+    loadSession: async () => ({ ...session }),
+    loadTemplate: async () => ({ ...missionTemplate }),
+    loadLevel: async () => ({ ...level }),
+    listOccupiedSlots: async () => [
+      { active_slot_index: 0, state: "cooldown", cooldown_until: "2025-12-31T23:00:00.000Z" },
+    ],
+    createInstance: async (input) =>
+      makeInstance({
+        active_slot_index: input.slotIndex,
+        activated_at: input.activatedAt,
+        ends_at: input.endsAt,
+        skip_available_at: input.skipAvailableAt,
+      }),
+    now: () => new Date("2026-01-01T00:00:00.000Z"),
+  });
+
+  assert.equal(result.activeSlotIndex, 0);
+});
+
+
 test("activateElement retourne un résultat UI-ready", async () => {
   const result = await activateElement("participant-1", "template-1", undefined, false, {
     loadParticipant: async () => ({ ...participant }),
     loadSession: async () => ({ ...session }),
     loadTemplate: async () => ({ ...missionTemplate }),
     loadLevel: async () => ({ ...level }),
-    listActiveSlots: async () => [],
+    listOccupiedSlots: async () => [],
     createInstance: async (input) =>
       makeInstance({
         active_slot_index: input.slotIndex,
@@ -154,4 +272,20 @@ test("activateElement retourne un résultat UI-ready", async () => {
   assert.equal(result.activatedAt, "2026-01-01T00:00:00.000Z");
   assert.equal(result.skipAvailableAt, "2026-01-01T00:00:42.000Z");
   assert.equal(result.endsAt, "2026-01-01T00:02:05.000Z");
+});
+
+test("activateElement: faux éléments bloqués avant le niveau 3", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "template-1", undefined, true, {
+        loadParticipant: async () => ({ ...participant }),
+        loadSession: async () => ({ ...session }),
+        loadTemplate: async () => ({ ...missionTemplate, can_be_fake: true }),
+        loadLevel: async () => ({ ...level, level_number: 2 }),
+        listOccupiedSlots: async () => [],
+        createInstance: async () => makeInstance(),
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /Fake elements unlock at level 3/,
+  );
 });
