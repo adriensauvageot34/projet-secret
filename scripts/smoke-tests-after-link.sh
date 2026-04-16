@@ -62,7 +62,7 @@ fi
 echo "4) Claim element result"
 curl -fsS -X POST "$APP_URL/api/elements/claim-result" \
   -H 'content-type: application/json' \
-  -d "{\"instanceId\":\"$ELEMENT_INSTANCE_ID\",\"finalResult\":\"success\"}" | jq .
+  -d "{\"instanceId\":\"$ELEMENT_INSTANCE_ID\",\"claimedResult\":\"success\"}" | jq .
 
 echo "5) Create score event"
 curl -fsS -X POST "$APP_URL/api/score-events" \
