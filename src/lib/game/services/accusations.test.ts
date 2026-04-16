@@ -310,6 +310,32 @@ test("guardrail: template type mismatch is rejected", async () => {
   );
 });
 
+test("guardrail: accusation targeting GM participant is rejected", async () => {
+  await assert.rejects(() =>
+    createAccusation(
+      {
+        sessionId: SESSION_ID,
+        accuserParticipantId: ACCUSER_ID,
+        accusedParticipantId: GM_ID,
+        suspectedType: "mission",
+        suspectedTemplateId: TEMPLATE_ID,
+        justification: "gm-target",
+      },
+      {
+        loadParticipantById: async (id) =>
+          id === GM_ID ? makeParticipant(GM_ID, { role: "gm", current_status: "gm" }) : makeParticipant(id),
+        loadTemplateById: async () => makeTemplate("mission"),
+        loadElementInstanceById: async () => {
+          throw new Error("not used");
+        },
+        createAccusationRow: async () => ({ id: ACCUSATION_ID } as never),
+        getAccusationDetailById: async () => makeAccusation(),
+      },
+    ),
+    /accused_participant_id must reference a player participant/,
+  );
+});
+
 test("guardrail: related_element_instance must belong to accused participant", async () => {
   await assert.rejects(() =>
     createAccusation(

@@ -212,6 +212,12 @@ function assertAdjudicatorRole(participant: Pick<Participant, "role">): void {
   }
 }
 
+function assertAccusedRole(participant: Pick<Participant, "role">): void {
+  if (participant.role === "gm") {
+    throw new Error("accused_participant_id must reference a player participant");
+  }
+}
+
 function isDuplicateTokenRewardError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -304,6 +310,7 @@ export async function createAccusation(input: CreateAccusationInput, deps: Creat
 
   assertSameSession(accuser, payload.sessionId, "accuser_participant");
   assertSameSession(accused, payload.sessionId, "accused_participant");
+  assertAccusedRole(accused);
   assertTemplateMatchesSuspectedType(suspectedTemplate, payload.suspectedType);
 
   if (payload.relatedElementInstanceId) {

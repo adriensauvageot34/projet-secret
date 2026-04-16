@@ -100,6 +100,14 @@ function parseActionError(message: string): string {
     return "Le template choisi ne correspond pas au type d'accusation.";
   }
 
+  if (message.includes("accused_participant_id must reference a player participant")) {
+    return "La cible n'est pas accusable (participant GM).";
+  }
+
+  if (message.includes("justification")) {
+    return "Justification invalide. Merci de saisir un texte clair avant envoi.";
+  }
+
   return message;
 }
 
