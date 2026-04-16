@@ -9,13 +9,15 @@ import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-ins
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { buildVisibleReserveTemplates } from "@/lib/game/services/reserve-templates";
 import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
+import { getSessionById } from "@/lib/db/queries/sessions";
 
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("participants")
-    .select("id, display_name, current_score, current_tokens")
-    .eq("session_id", sessionId);
+    .select("id, display_name, current_score, current_tokens, role")
+    .eq("session_id", sessionId)
+    .neq("role", "gm");
 
   if (error) {
     throw new Error(`Failed to load session ranking participants: ${error.message}`);
@@ -115,6 +117,11 @@ export async function GET(_request: Request, context: { params: { participantId:
       listAdvantageElementTargets(participant.session_id, participant.id),
     ]);
 
+    const session = await getSessionById(participant.session_id);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
     const templatesById = new Map(templatesForLevel.map((template) => [template.id, template]));
 
     const activeElements = instances
@@ -180,6 +187,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       ok: true,
       data: {
         participant,
+        sessionStatus: session.status,
         level: {
           id: level.id,
           levelNumber: level.level_number,

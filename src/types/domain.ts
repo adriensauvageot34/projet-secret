@@ -31,7 +31,6 @@ export interface Session {
   reserve_per_difficulty: number;
   fake_unlock_level: number;
   fake_cycle_every_n_completed: number;
-  bottom_count_for_wheel: number;
   game_mode: string;
   notes: string;
   gm_session_notes: string;

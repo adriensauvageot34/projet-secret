@@ -1,15 +1,18 @@
 import { submitProof as submitProofMutation } from "@/lib/db/mutations/element-instances";
 import { getElementInstanceById } from "@/lib/db/queries/element-instances";
 import { getElementTemplateById } from "@/lib/db/queries/element-templates";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
 
 type SubmitProofDependencies = {
+  assertSessionIsLiveById: (sessionId: string) => Promise<void>;
   getElementInstanceById: (instanceId: string) => Promise<ElementInstance | null>;
   getElementTemplateById: (templateId: string) => Promise<ElementTemplate | null>;
   submitProof: (instanceId: string) => Promise<ElementInstance>;
 };
 
 const defaultDependencies: SubmitProofDependencies = {
+  assertSessionIsLiveById,
   getElementInstanceById,
   getElementTemplateById,
   submitProof: submitProofMutation,
@@ -41,15 +44,17 @@ function assertProofSubmittable(instance: ElementInstance, template: ElementTemp
 
 export async function submitProof(
   instanceId: string,
-  dependencies: SubmitProofDependencies = defaultDependencies,
+  dependencies: Partial<SubmitProofDependencies> = {},
 ): Promise<SubmitProofOutput> {
-  const instance = await dependencies.getElementInstanceById(instanceId);
+  const resolvedDependencies = { ...defaultDependencies, ...dependencies };
+  const instance = await resolvedDependencies.getElementInstanceById(instanceId);
 
   if (!instance) {
     throw new Error("Element instance not found");
   }
+  await resolvedDependencies.assertSessionIsLiveById(instance.session_id);
 
-  const template = await dependencies.getElementTemplateById(instance.element_template_id);
+  const template = await resolvedDependencies.getElementTemplateById(instance.element_template_id);
 
   if (!template) {
     throw new Error(`Element template not found for instance template ${instance.element_template_id}`);
@@ -69,7 +74,7 @@ export async function submitProof(
     throw new Error(`Proof cannot be submitted from status ${instance.proof_status}`);
   }
 
-  const updatedInstance = await dependencies.submitProof(instanceId);
+  const updatedInstance = await resolvedDependencies.submitProof(instanceId);
 
   return {
     ok: true,

@@ -1,10 +1,11 @@
 import { createElementInstance, getEndsAt, getSkipAvailableAt } from "@/lib/db/mutations/element-instances";
 import { getSkipUnlockTime, getEndTime, isEligibleForReserve } from "@/lib/game/engine/template-engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { assertSessionAllowsGameplay } from "@/lib/game/rules/session";
 import type { ElementInstance, ElementTemplate, Level, Participant, Session } from "@/types/domain";
 
 type ActivationParticipant = Pick<Participant, "id" | "session_id" | "mission_slot_max" | "constraint_slot_max" | "current_level_id">;
-type ActivationSession = Pick<Session, "id" | "max_active_missions" | "max_active_constraints">;
+type ActivationSession = Pick<Session, "id" | "max_active_missions" | "max_active_constraints"> & { status?: Session["status"] };
 type ActivationLevel = Pick<Level, "id" | "level_number" | "mission_difficulty_max" | "constraint_difficulty_max">;
 type ActivationTemplate = Pick<
   ElementTemplate,
@@ -190,7 +191,7 @@ function createDefaultDeps(): ActivateElementDeps {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase
         .from("sessions")
-        .select("id, max_active_missions, max_active_constraints")
+        .select("id, status, max_active_missions, max_active_constraints")
         .eq("id", sessionId)
         .maybeSingle();
 
@@ -279,6 +280,7 @@ export async function activateElement(
   if (!session) {
     throw new Error("Session not found for participant");
   }
+  assertSessionAllowsGameplay(session.status ?? "live");
 
   if (!template) {
     throw new Error("Element template not found");

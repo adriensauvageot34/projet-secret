@@ -4,6 +4,7 @@ import type { ScoreEvent, ScoreEventDetail } from "@/types/domain";
 import type { ScoreEventType } from "@/lib/game/enums";
 import { enrichScoreEventRow, getScoreEventById } from "@/lib/db/queries/score-events";
 import { updateParticipantLevel } from "@/lib/db/mutations/participants";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 
 export const createScoreEventSchema = z.object({
   participantId: z.string().uuid(),
@@ -119,6 +120,7 @@ export async function reconcileParticipantCurrentScore(participantId: string): P
 }
 
 async function validateCreateInput(payload: CreateScoreEventPayload): Promise<void> {
+  await assertSessionIsLiveById(payload.sessionId);
   assertScoreEventTypeDeltaConsistency(payload.eventType, payload.deltaPoints);
 
   const supabase = createServerSupabaseClient();

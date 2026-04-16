@@ -9,6 +9,7 @@ import { createGMDecisionRecord } from "@/lib/db/mutations/gm-decisions";
 import { getAccusationById, type AccusationDetail } from "@/lib/db/queries/accusations";
 import { hasAccusationCorrectRewardTokenEvent } from "@/lib/game/services/token-events";
 import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 
 const suspectedTypeSchema = z.enum(["mission", "constraint"]);
 const accusationStatusSchema = z.enum(["submitted", "under_review", "validated", "rejected", "cancelled"]);
@@ -261,6 +262,7 @@ async function createArbitrationDecisionRecord(params: {
 }
 
 type CreateAccusationDeps = {
+  assertSessionIsLiveByIdEntry: typeof assertSessionIsLiveById;
   loadParticipantById: typeof loadParticipant;
   loadTemplateById: typeof loadTemplate;
   loadElementInstanceById: typeof loadElementInstance;
@@ -269,6 +271,7 @@ type CreateAccusationDeps = {
 };
 
 const defaultCreateAccusationDeps: CreateAccusationDeps = {
+  assertSessionIsLiveByIdEntry: assertSessionIsLiveById,
   loadParticipantById: loadParticipant,
   loadTemplateById: loadTemplate,
   loadElementInstanceById: loadElementInstance,
@@ -277,6 +280,7 @@ const defaultCreateAccusationDeps: CreateAccusationDeps = {
 };
 
 type AdjudicateAccusationDeps = {
+  assertSessionIsLiveByIdEntry: typeof assertSessionIsLiveById;
   getAccusationDetailById: typeof getAccusationById;
   loadParticipantById: typeof loadParticipant;
   updateAccusationRow: typeof updateAccusationRecord;
@@ -288,6 +292,7 @@ type AdjudicateAccusationDeps = {
 };
 
 const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
+  assertSessionIsLiveByIdEntry: assertSessionIsLiveById,
   getAccusationDetailById: getAccusationById,
   loadParticipantById: loadParticipant,
   updateAccusationRow: updateAccusationRecord,
@@ -298,17 +303,19 @@ const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
   consumeFirstArmedAdvantageEntry: consumeFirstArmedAdvantage,
 };
 
-export async function createAccusation(input: CreateAccusationInput, deps: CreateAccusationDeps = defaultCreateAccusationDeps): Promise<AccusationDetail> {
+export async function createAccusation(input: CreateAccusationInput, deps: Partial<CreateAccusationDeps> = {}): Promise<AccusationDetail> {
+  const resolvedDeps = { ...defaultCreateAccusationDeps, ...deps };
   const payload = createAccusationSchema.parse(input);
+  await resolvedDeps.assertSessionIsLiveByIdEntry(payload.sessionId);
 
   if (payload.accuserParticipantId === payload.accusedParticipantId) {
     throw new Error("accuser_participant_id must be different from accused_participant_id");
   }
 
   const [accuser, accused, suspectedTemplate] = await Promise.all([
-    deps.loadParticipantById(payload.accuserParticipantId),
-    deps.loadParticipantById(payload.accusedParticipantId),
-    deps.loadTemplateById(payload.suspectedTemplateId),
+    resolvedDeps.loadParticipantById(payload.accuserParticipantId),
+    resolvedDeps.loadParticipantById(payload.accusedParticipantId),
+    resolvedDeps.loadTemplateById(payload.suspectedTemplateId),
   ]);
 
   assertSameSession(accuser, payload.sessionId, "accuser_participant");
@@ -317,12 +324,12 @@ export async function createAccusation(input: CreateAccusationInput, deps: Creat
   assertTemplateMatchesSuspectedType(suspectedTemplate, payload.suspectedType);
 
   if (payload.relatedElementInstanceId) {
-    const relatedInstance = await deps.loadElementInstanceById(payload.relatedElementInstanceId);
+    const relatedInstance = await resolvedDeps.loadElementInstanceById(payload.relatedElementInstanceId);
     assertSameSession(relatedInstance, payload.sessionId, "related_element_instance");
     assertRelatedInstanceMatchesAccusation(relatedInstance, payload);
   }
 
-  const created = await deps.createAccusationRow({
+  const created = await resolvedDeps.createAccusationRow({
     session_id: payload.sessionId,
     accuser_participant_id: payload.accuserParticipantId,
     accused_participant_id: payload.accusedParticipantId,
@@ -343,7 +350,7 @@ export async function createAccusation(input: CreateAccusationInput, deps: Creat
     notes_admin: null,
   });
 
-  const detail = await deps.getAccusationDetailById(created.id);
+  const detail = await resolvedDeps.getAccusationDetailById(created.id);
 
   if (!detail) {
     throw new Error("Failed to reload created accusation");
@@ -354,6 +361,7 @@ export async function createAccusation(input: CreateAccusationInput, deps: Creat
 
 export async function markAccusationUnderReview(input: MarkAccusationUnderReviewInput): Promise<AccusationDetail> {
   const payload = markAccusationUnderReviewSchema.parse(input);
+  await assertSessionIsLiveById(payload.sessionId);
   const accusation = await getAccusationById(payload.accusationId);
 
   if (!accusation) {
@@ -384,10 +392,12 @@ export async function markAccusationUnderReview(input: MarkAccusationUnderReview
 
 export async function adjudicateAccusation(
   input: AdjudicateAccusationInput,
-  deps: AdjudicateAccusationDeps = defaultAdjudicateAccusationDeps,
+  deps: Partial<AdjudicateAccusationDeps> = {},
 ): Promise<AccusationDetail> {
+  const resolvedDeps = { ...defaultAdjudicateAccusationDeps, ...deps };
   const payload = adjudicateAccusationSchema.parse(input);
-  const accusation = await deps.getAccusationDetailById(payload.accusationId);
+  await resolvedDeps.assertSessionIsLiveByIdEntry(payload.sessionId);
+  const accusation = await resolvedDeps.getAccusationDetailById(payload.accusationId);
 
   if (!accusation) {
     throw new Error("Accusation not found");
@@ -397,7 +407,7 @@ export async function adjudicateAccusation(
     throw new Error("Accusation belongs to another session");
   }
 
-  const adjudicator = await deps.loadParticipantById(payload.adjudicatedByParticipantId);
+  const adjudicator = await resolvedDeps.loadParticipantById(payload.adjudicatedByParticipantId);
   assertSameSession(adjudicator, payload.sessionId, "adjudicated_by_participant");
   assertAdjudicatorRole(adjudicator);
 
@@ -417,7 +427,7 @@ export async function adjudicateAccusation(
     throw new Error("cancelled_previous_validation can only be true for correct/fake_bait_triggered/cancelled_by_gm");
   }
 
-  await deps.updateAccusationRow(accusation.id, {
+  await resolvedDeps.updateAccusationRow(accusation.id, {
     status: decisionOutcome.status,
     decision: payload.decision,
     verdict: decisionOutcome.verdict,
@@ -431,11 +441,11 @@ export async function adjudicateAccusation(
   });
 
   if (payload.decision === "correct" && rewardTokens > 0) {
-    const alreadyRewarded = await deps.hasAccusationCorrectRewardTokenEventEntry(accusation.id);
+    const alreadyRewarded = await resolvedDeps.hasAccusationCorrectRewardTokenEventEntry(accusation.id);
 
     if (!alreadyRewarded) {
       try {
-        await deps.createTokenEventEntry({
+        await resolvedDeps.createTokenEventEntry({
           participantId: accusation.accuser_participant_id,
           sessionId: accusation.session_id,
           eventType: "accusation_correct",
@@ -453,13 +463,13 @@ export async function adjudicateAccusation(
   }
 
   if (payload.decision === "correct") {
-    const consumedAccusationBonus = await deps.consumeFirstArmedAdvantageEntry({
+    const consumedAccusationBonus = await resolvedDeps.consumeFirstArmedAdvantageEntry({
       participantId: accusation.accuser_participant_id,
       effectCode: "next_correct_accusation_bonus_3",
     });
 
     if (consumedAccusationBonus) {
-      await deps.createTokenEventEntry({
+      await resolvedDeps.createTokenEventEntry({
         participantId: accusation.accuser_participant_id,
         sessionId: accusation.session_id,
         eventType: "bonus_effect",
@@ -481,7 +491,7 @@ export async function adjudicateAccusation(
     const bonusScore = payload.fakeBaitBonusScore ?? 5;
 
     if (bonusTokens > 0) {
-      await deps.createTokenEventEntry({
+      await resolvedDeps.createTokenEventEntry({
         participantId: accusation.accused_participant_id,
         sessionId: accusation.session_id,
         eventType: "fake_bait_bonus",
@@ -494,7 +504,7 @@ export async function adjudicateAccusation(
     }
 
     if (bonusScore !== 0) {
-      await deps.createScoreEventEntry({
+      await resolvedDeps.createScoreEventEntry({
         participantId: accusation.accused_participant_id,
         sessionId: accusation.session_id,
         eventType: "fake_bait_bonus",
@@ -508,7 +518,7 @@ export async function adjudicateAccusation(
   }
 
   if (cancelledPreviousValidation || payload.decision === "cancelled_by_gm" || payload.createGmDecisionRecord) {
-    await deps.createArbitrationDecision({
+    await resolvedDeps.createArbitrationDecision({
       accusation,
       adjudicatedByParticipantId: payload.adjudicatedByParticipantId,
       decision: payload.decision,
@@ -516,7 +526,7 @@ export async function adjudicateAccusation(
     });
   }
 
-  const detail = await deps.getAccusationDetailById(accusation.id);
+  const detail = await resolvedDeps.getAccusationDetailById(accusation.id);
 
   if (!detail) {
     throw new Error("Failed to reload accusation");

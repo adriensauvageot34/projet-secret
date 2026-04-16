@@ -1,15 +1,18 @@
 import { claimResult, createScoreEventFromInstance, resolveElement } from "@/lib/db/mutations/element-instances";
 import { recomputeParticipantSlots, updateCombo, updateParticipantLevel } from "@/lib/db/mutations/participants";
 import { listScoreEvents } from "@/lib/db/queries/score-events";
+import { getElementInstanceById } from "@/lib/db/queries/element-instances";
 import { getElementTemplateById } from "@/lib/db/queries/element-templates";
 import { createScoreEvent } from "@/lib/game/services/score-events";
 import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 import type { ClaimedResult, FinalResult, ScoreEventType, ValidationMode } from "@/lib/game/enums";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
 
 type ClaimTemplateContext = Pick<ElementTemplate, "validation_mode" | "duration_seconds" | "base_points" | "element_type">;
 
 type ResolveElementClaimDependencies = {
+  getElementInstanceById?: (instanceId: string) => Promise<ElementInstance | null>;
   claimResult: (instanceId: string, claimedResult: ClaimedResult) => Promise<ElementInstance>;
   resolveElement: (
     instanceId: string,
@@ -58,6 +61,7 @@ const RESOLUTION_SCORE_EVENTS: readonly ScoreEventType[] = [
 ] as const;
 
 const defaultDependencies: ResolveElementClaimDependencies = {
+  getElementInstanceById,
   claimResult,
   resolveElement,
   getElementTemplateById,
@@ -272,6 +276,16 @@ export async function resolveElementClaim(
   claimedResult: ClaimedResult,
   dependencies: ResolveElementClaimDependencies = defaultDependencies,
 ): Promise<ResolveElementClaimOutput> {
+  if (dependencies.getElementInstanceById) {
+    const existingInstance = await dependencies.getElementInstanceById(instanceId);
+
+    if (!existingInstance) {
+      throw new Error("Element instance not found");
+    }
+
+    await assertSessionIsLiveById(existingInstance.session_id);
+  }
+
   const claimedInstance = await dependencies.claimResult(instanceId, claimedResult);
   assertNotAlreadyFinalized(claimedInstance);
 

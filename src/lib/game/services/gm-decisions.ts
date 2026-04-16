@@ -6,6 +6,7 @@ import { createGMDecisionRecord, updateGMDecisionRecord } from "@/lib/db/mutatio
 import { createScoreEvent } from "@/lib/game/services/score-events";
 import { createTokenEvent } from "@/lib/game/services/token-events";
 import { getGMDecisionById, type GMDecisionDetail } from "@/lib/db/queries/gm-decisions";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 
 const decisionTypeSchema = z.enum([
   "validation_override",
@@ -227,6 +228,7 @@ async function validateCreatePayload(payload: z.output<typeof createGMDecisionSc
 
 export async function createGMDecision(input: CreateGMDecisionInput): Promise<GMDecisionDetail> {
   const payload = createGMDecisionSchema.parse(input);
+  await assertSessionIsLiveById(payload.sessionId);
   await validateCreatePayload(payload);
 
   const created = await createGMDecisionRecord({
@@ -333,6 +335,7 @@ export async function applyGMDecision(input: ApplyGMDecisionInput): Promise<GMDe
   if (!decision) {
     throw new Error("GM decision not found");
   }
+  await assertSessionIsLiveById(decision.session_id);
 
   if (decision.status === "cancelled") {
     throw new Error("A cancelled GM decision cannot be applied");
@@ -373,6 +376,7 @@ export async function cancelGMDecision(input: CancelGMDecisionInput): Promise<GM
   if (!decision) {
     throw new Error("GM decision not found");
   }
+  await assertSessionIsLiveById(decision.session_id);
 
   if (decision.status === "applied") {
     throw new Error("An applied GM decision cannot be cancelled");

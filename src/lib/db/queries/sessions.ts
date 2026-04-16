@@ -31,3 +31,18 @@ export async function getCurrentSession(): Promise<Session | null> {
 
   return sessions[0] ?? null;
 }
+
+export async function getSessionById(sessionId: string): Promise<Session | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load session ${sessionId}: ${error.message}`);
+  }
+
+  return (data as Session | null) ?? null;
+}
