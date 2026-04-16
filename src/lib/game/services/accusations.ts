@@ -59,20 +59,35 @@ export type CancelAccusationInput = z.input<typeof cancelAccusationSchema>;
 export function mapDecisionToOutcome(decision: AccusationDecision): {
   status: AccusationStatus;
   verdict: AccusationVerdict;
-  isReceivable: boolean;
+  isReceivable: boolean | null;
   triggeredFakeBait: boolean;
 } {
+  const isReceivable = mapDecisionToIsReceivable(decision);
+
   switch (decision) {
     case "correct":
-      return { status: "validated", verdict: "juste", isReceivable: true, triggeredFakeBait: false };
+      return { status: "validated", verdict: "juste", isReceivable, triggeredFakeBait: false };
     case "incorrect":
-      return { status: "rejected", verdict: "fausse", isReceivable: true, triggeredFakeBait: false };
+      return { status: "rejected", verdict: "fausse", isReceivable, triggeredFakeBait: false };
     case "not_receivable":
-      return { status: "rejected", verdict: "irrecevable", isReceivable: false, triggeredFakeBait: false };
+      return { status: "rejected", verdict: "irrecevable", isReceivable, triggeredFakeBait: false };
     case "fake_bait_triggered":
-      return { status: "validated", verdict: "juste", isReceivable: true, triggeredFakeBait: true };
+      return { status: "validated", verdict: "juste", isReceivable, triggeredFakeBait: true };
     case "cancelled_by_gm":
-      return { status: "cancelled", verdict: "annulée", isReceivable: false, triggeredFakeBait: false };
+      return { status: "cancelled", verdict: "annulée", isReceivable, triggeredFakeBait: false };
+  }
+}
+
+export function mapDecisionToIsReceivable(decision: AccusationDecision): boolean | null {
+  switch (decision) {
+    case "correct":
+    case "incorrect":
+    case "fake_bait_triggered":
+      return true;
+    case "not_receivable":
+      return false;
+    case "cancelled_by_gm":
+      return null;
   }
 }
 

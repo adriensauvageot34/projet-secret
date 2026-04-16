@@ -4,6 +4,7 @@ import {
   adjudicateAccusationSchema,
   assertStatusDecisionVerdictConsistency,
   createAccusationSchema,
+  mapDecisionToIsReceivable,
   mapDecisionToOutcome,
 } from "@/lib/game/services/accusations";
 
@@ -75,9 +76,17 @@ test("adjudication mapping: each decision maps to expected status/verdict/flags"
   assert.deepEqual(mapDecisionToOutcome("cancelled_by_gm"), {
     status: "cancelled",
     verdict: "annulée",
-    isReceivable: false,
+    isReceivable: null,
     triggeredFakeBait: false,
   });
+});
+
+test("adjudication mapping: is_receivable mirror follows decision convention", () => {
+  assert.equal(mapDecisionToIsReceivable("correct"), true);
+  assert.equal(mapDecisionToIsReceivable("incorrect"), true);
+  assert.equal(mapDecisionToIsReceivable("fake_bait_triggered"), true);
+  assert.equal(mapDecisionToIsReceivable("not_receivable"), false);
+  assert.equal(mapDecisionToIsReceivable("cancelled_by_gm"), null);
 });
 
 test("adjudication schema: non-negative rewards and bonus values are enforced", () => {
