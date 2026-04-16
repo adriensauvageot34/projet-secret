@@ -173,3 +173,20 @@ export async function createTokenEvent(input: CreateTokenEventInput) {
 
   return enriched ?? enrichTokenEventRow(data as TokenEvent);
 }
+
+export async function hasAccusationCorrectRewardTokenEvent(accusationId: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("token_events")
+    .select("id")
+    .eq("related_accusation_id", accusationId)
+    .eq("event_type", "accusation_correct")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to verify accusation reward token event: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
