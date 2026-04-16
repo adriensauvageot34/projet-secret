@@ -10,6 +10,7 @@ import { GmLiveElements } from "@/components/gm/gm-live-elements";
 import { GmAccusationsQueue } from "@/components/gm/gm-accusations-queue";
 import { GmDecisionsPanel } from "@/components/gm/gm-decisions-panel";
 import { GmScoreboard } from "@/components/gm/gm-scoreboard";
+import { GmActiveTicketQueue } from "@/components/gm/gm-active-ticket-queue";
 
 export function GmDashboard() {
   const gm = useGmRuntime();
@@ -45,6 +46,7 @@ export function GmDashboard() {
         actionError={gm.actionError}
       />
       <GmParticipantList participants={gm.runtime.participants} />
+      <GmActiveTicketQueue tickets={gm.runtime.activeGmTickets} />
       <GmLiveElements liveElements={gm.runtime.liveElements} />
       <GmAccusationsQueue
         accusations={gm.runtime.accusations}

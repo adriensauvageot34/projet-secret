@@ -92,6 +92,18 @@ function parseActionError(message: string): string {
     return "Ce template n'est pas achetable à votre niveau/tier actuel.";
   }
 
+  if (message.includes("missing_target_participant_id")) {
+    return "Cible requise pour activer ce ticket GM.";
+  }
+
+  if (message.includes("target_participant_must_be_other")) {
+    return "La cible doit être un autre participant.";
+  }
+
+  if (message.includes("Cannot consume advantage use: invalid_state")) {
+    return "Impossible de consommer ce ticket dans son état actuel.";
+  }
+
   if (message.includes("accuser_participant_id must be different")) {
     return "Vous ne pouvez pas vous auto-accuser.";
   }
@@ -137,6 +149,7 @@ export function usePlayerRuntime(participantId: string) {
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [pendingInstanceId, setPendingInstanceId] = useState<string | null>(null);
   const [pendingShopTemplateId, setPendingShopTemplateId] = useState<string | null>(null);
+  const [pendingAdvantageActionId, setPendingAdvantageActionId] = useState<string | null>(null);
   const [isCreatingAccusation, setIsCreatingAccusation] = useState(false);
   const [lastClaimFlowByInstanceId, setLastClaimFlowByInstanceId] = useState<Record<string, string>>({});
 
@@ -275,6 +288,49 @@ export function usePlayerRuntime(participantId: string) {
     }
   }, [loadRuntime, participantId, runtime?.participant.session_id]);
 
+  const activateAdvantage = useCallback(async (params: {
+    advantageInstanceId: string;
+    targetParticipantId?: string | null;
+  }) => {
+    try {
+      setPendingAdvantageActionId(params.advantageInstanceId);
+      setActionError(null);
+      setSuccessMessage(null);
+
+      await postJson("/api/advantages/activate", {
+        advantageInstanceId: params.advantageInstanceId,
+        targetParticipantId: params.targetParticipantId ?? null,
+      });
+
+      setSuccessMessage("Ticket GM activé.");
+      await loadRuntime(false);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Activation du ticket impossible");
+    } finally {
+      setPendingAdvantageActionId(null);
+    }
+  }, [loadRuntime]);
+
+  const useAdvantage = useCallback(async (params: { advantageInstanceId: string }) => {
+    try {
+      setPendingAdvantageActionId(params.advantageInstanceId);
+      setActionError(null);
+      setSuccessMessage(null);
+
+      await postJson("/api/advantages/use", {
+        advantageInstanceId: params.advantageInstanceId,
+        gmNotes: "Ticket GM consommé depuis interface joueur",
+      });
+
+      setSuccessMessage("Ticket GM consommé.");
+      await loadRuntime(false);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Consommation du ticket impossible");
+    } finally {
+      setPendingAdvantageActionId(null);
+    }
+  }, [loadRuntime]);
+
   return useMemo(() => ({
     runtime,
     isLoading,
@@ -285,6 +341,7 @@ export function usePlayerRuntime(participantId: string) {
     pendingTemplateId,
     pendingInstanceId,
     pendingShopTemplateId,
+    pendingAdvantageActionId,
     isCreatingAccusation,
     lastClaimFlowByInstanceId,
     refresh: () => loadRuntime(false),
@@ -292,8 +349,11 @@ export function usePlayerRuntime(participantId: string) {
     claimResult,
     buyAdvantage,
     createAccusation,
+    activateAdvantage,
+    useAdvantage,
   }), [
     activateElement,
+    activateAdvantage,
     actionError,
     buyAdvantage,
     claimResult,
@@ -304,10 +364,12 @@ export function usePlayerRuntime(participantId: string) {
     isRefreshing,
     lastClaimFlowByInstanceId,
     loadRuntime,
+    pendingAdvantageActionId,
     pendingInstanceId,
     pendingShopTemplateId,
     pendingTemplateId,
     runtime,
     successMessage,
+    useAdvantage,
   ]);
 }

@@ -9,13 +9,21 @@ const TEMPLATE_SELECT = `
   target_type,
   duration_seconds,
   max_uses,
-  cost_tokens
+  cost_tokens,
+  description_player
 `;
 
 type RawAdvantageWithTemplate = AdvantageInstance & {
   advantage_templates: Pick<
     AdvantageTemplate,
-    "name" | "effect_code" | "effect_family" | "target_type" | "duration_seconds" | "max_uses" | "cost_tokens"
+    | "name"
+    | "effect_code"
+    | "effect_family"
+    | "target_type"
+    | "duration_seconds"
+    | "max_uses"
+    | "cost_tokens"
+    | "description_player"
   > | null;
 };
 

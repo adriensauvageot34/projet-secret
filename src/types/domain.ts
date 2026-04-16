@@ -216,7 +216,14 @@ export interface AdvantageInstance {
 export interface AdvantageInstanceWithTemplate extends AdvantageInstance {
   template: Pick<
     AdvantageTemplate,
-    "name" | "effect_code" | "effect_family" | "target_type" | "duration_seconds" | "max_uses" | "cost_tokens"
+    | "name"
+    | "effect_code"
+    | "effect_family"
+    | "target_type"
+    | "duration_seconds"
+    | "max_uses"
+    | "cost_tokens"
+    | "description_player"
   >;
 }
 
