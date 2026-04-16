@@ -22,5 +22,6 @@
 
 ## Conventions clés
 
+- Le contrat MVP canonique ne conserve **aucune** colonne legacy (`delta`, `source_table`, `source_id`, `meta`) dans `token_events`.
 - Les corrections rétroactives doivent privilégier des événements compensatoires (`cancellation`, `refund`, `manual_adjustment`) plutôt que modifier l’historique.
 - Les lookups Airtable sont exposés en lecture enrichie côté requêtes/services (pas stockés comme colonnes redondantes).
