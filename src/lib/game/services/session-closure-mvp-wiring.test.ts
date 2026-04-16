@@ -17,7 +17,8 @@ test("blocage post-clôture: achats/accusations/décisions GM vérifient session
   const accusations = readFileSync("src/lib/game/services/accusations.ts", "utf8");
   const decisions = readFileSync("src/lib/game/services/gm-decisions.ts", "utf8");
 
-  assert.match(advantageService, /assertSessionIsLiveById\(participant\.session_id\)/);
+  assert.match(advantageService, /assertSessionIsLiveByIdEntry: assertSessionIsLiveById/);
+  assert.match(advantageService, /await deps\.assertSessionIsLiveByIdEntry\(participant\.session_id\)/);
   assert.match(accusations, /assertSessionIsLiveById\(payload\.sessionId\)/);
   assert.match(decisions, /assertSessionIsLiveById\(payload\.sessionId\)/);
 });

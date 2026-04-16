@@ -75,6 +75,7 @@ function assertAtomicPurchaseResult(
 }
 
 export type PurchaseAdvantageDeps = {
+  assertSessionIsLiveByIdEntry: typeof assertSessionIsLiveById;
   loadParticipant: (participantId: string) => Promise<Participant | null>;
   loadTemplate: (templateId: string) => Promise<AdvantageTemplate | null>;
   loadLevelById: (levelId: string) => Promise<Level | null>;
@@ -88,6 +89,7 @@ export type PurchaseAdvantageDeps = {
 
 function createPurchaseDeps(): PurchaseAdvantageDeps {
   return {
+    assertSessionIsLiveByIdEntry: assertSessionIsLiveById,
     loadParticipant: getParticipantById,
     loadTemplate: getAdvantageTemplateById,
     loadLevelById: getLevelById,
@@ -121,7 +123,7 @@ async function buildPurchaseContext(
   if (!participant) {
     throw new Error("Participant not found");
   }
-  await assertSessionIsLiveById(participant.session_id);
+  await deps.assertSessionIsLiveByIdEntry(participant.session_id);
 
   const template = await deps.loadTemplate(input.templateId);
 
