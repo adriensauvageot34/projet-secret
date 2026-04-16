@@ -3,10 +3,15 @@ import type { ClaimedResult, FinalResult, ScoreEventType } from "@/lib/game/enum
 import { mapFinalResultToState } from "@/lib/game/state-machines/element-instance-machine";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
 
-type ActivateElementInput = {
+export type CreateElementInstanceInput = {
   participantId: string;
+  sessionId: string;
   templateId: string;
   slotIndex: number;
+  activatedAt: string;
+  endsAt: string;
+  skipAvailableAt: string;
+  proofStatus: ElementInstance["proof_status"];
   isFake?: boolean;
 };
 
@@ -18,14 +23,6 @@ function addSeconds(base: Date, seconds: number): string {
   return new Date(base.getTime() + seconds * 1_000).toISOString();
 }
 
-function computeSkipAvailableAt(
-  activatedAt: Date,
-  template: Pick<ElementTemplate, "skip_unlock_rule" | "duration_seconds">,
-): string {
-  const ratio = template.skip_unlock_rule === "one_half" ? 0.5 : 1 / 3;
-  return addSeconds(activatedAt, Math.ceil(template.duration_seconds * ratio));
-}
-
 function assertSingleRow<T>(data: T | null, error: { message: string } | null, context: string): T {
   if (error || !data) {
     throw new Error(`${context}: ${error?.message ?? "not found"}`);
@@ -34,37 +31,20 @@ function assertSingleRow<T>(data: T | null, error: { message: string } | null, c
   return data;
 }
 
-export async function activateElement(input: ActivateElementInput): Promise<ElementInstance> {
+export async function createElementInstance(input: CreateElementInstanceInput): Promise<ElementInstance> {
   const supabase = createServerSupabaseClient();
-
-  const { data: participant, error: participantError } = await supabase
-    .from("participants")
-    .select("id, session_id")
-    .eq("id", input.participantId)
-    .maybeSingle();
-
-  const runtimeParticipant = assertSingleRow(participant, participantError, "Failed to load participant for activation");
-
-  const { data: template, error: templateError } = await supabase
-    .from("element_templates")
-    .select("id, duration_seconds, skip_unlock_rule, proof_required")
-    .eq("id", input.templateId)
-    .maybeSingle();
-
-  const runtimeTemplate = assertSingleRow(template, templateError, "Failed to load element template for activation");
-  const activatedAt = new Date();
 
   const payload = {
     participant_id: input.participantId,
-    session_id: runtimeParticipant.session_id,
+    session_id: input.sessionId,
     element_template_id: input.templateId,
     state: "active" as const,
     active_slot_index: input.slotIndex,
     is_fake: input.isFake ?? false,
-    activated_at: activatedAt.toISOString(),
-    ends_at: addSeconds(activatedAt, runtimeTemplate.duration_seconds),
-    skip_available_at: computeSkipAvailableAt(activatedAt, runtimeTemplate),
-    proof_status: runtimeTemplate.proof_required ? "pending" : "not_required",
+    activated_at: input.activatedAt,
+    ends_at: input.endsAt,
+    skip_available_at: input.skipAvailableAt,
+    proof_status: input.proofStatus,
   };
 
   const { data: instance, error: insertError } = await supabase
