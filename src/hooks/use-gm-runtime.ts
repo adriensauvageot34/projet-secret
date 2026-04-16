@@ -38,6 +38,10 @@ function toUiError(rawMessage: string): string {
     return "Décision déjà appliquée: annulation impossible.";
   }
 
+  if (rawMessage.includes("gameplay is locked")) {
+    return "Session terminée : les actions gameplay sont verrouillées.";
+  }
+
   return rawMessage;
 }
 
@@ -207,6 +211,20 @@ export function useGmRuntime() {
     );
   }, [runAction]);
 
+  const finishSession = useCallback(async () => {
+    if (!runtime) {
+      return;
+    }
+
+    await runAction(
+      "finish-session",
+      async () => {
+        await postJson("/api/sessions/finish", { sessionId: runtime.session.id });
+      },
+      "Session terminée. Jeu figé, classement final disponible.",
+    );
+  }, [runAction, runtime]);
+
   return useMemo(() => ({
     runtime,
     isLoading,
@@ -221,6 +239,7 @@ export function useGmRuntime() {
     createDecision,
     applyDecision,
     cancelDecision,
+    finishSession,
   }), [
     runtime,
     isLoading,
@@ -235,5 +254,6 @@ export function useGmRuntime() {
     createDecision,
     applyDecision,
     cancelDecision,
+    finishSession,
   ]);
 }

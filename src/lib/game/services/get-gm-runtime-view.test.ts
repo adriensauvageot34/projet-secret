@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapGmRuntimeElement } from "@/lib/game/services/get-gm-runtime-view";
+import { buildGmFinalSummary, mapGmRuntimeElement } from "@/lib/game/services/get-gm-runtime-view";
 
 function makeRawElementRow(overrides: Partial<Parameters<typeof mapGmRuntimeElement>[0]> = {}): Parameters<typeof mapGmRuntimeElement>[0] {
   return {
@@ -57,4 +57,50 @@ test("signal gm_pending: visible uniquement en mode gm après claim et avant fin
     }),
   );
   assert.equal(alreadyFinal.is_gm_pending, false);
+});
+
+test("résumé final GM: exclut le GM, expose winner/podium/bottom5", () => {
+  const summary = buildGmFinalSummary([
+    {
+      id: "gm",
+      session_id: "s1",
+      display_name: "GM",
+      role: "gm",
+      current_status: "gm",
+      current_score: 999,
+      current_tokens: 999,
+      completed_elements_count: 0,
+      waiting_slot_count: 0,
+      blocked_slot_count: 0,
+    },
+    {
+      id: "p1",
+      session_id: "s1",
+      display_name: "Alice",
+      role: "player",
+      current_status: "active",
+      current_score: 10,
+      current_tokens: 2,
+      completed_elements_count: 0,
+      waiting_slot_count: 0,
+      blocked_slot_count: 0,
+    },
+    {
+      id: "p2",
+      session_id: "s1",
+      display_name: "Bob",
+      role: "player",
+      current_status: "active",
+      current_score: 20,
+      current_tokens: 1,
+      completed_elements_count: 0,
+      waiting_slot_count: 0,
+      blocked_slot_count: 0,
+    },
+  ]);
+
+  assert.equal(summary.ranking.length, 2);
+  assert.equal(summary.winner?.participantId, "p2");
+  assert.deepEqual(summary.podium.map((entry) => entry.participantId), ["p2", "p1"]);
+  assert.deepEqual(summary.bottomFive.map((entry) => entry.participantId), ["p2", "p1"]);
 });

@@ -2,12 +2,15 @@ import type { GmRuntimeParticipant } from "@/lib/game/services/get-gm-runtime-vi
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { buildLiveRanking } from "@/lib/game/services/live-ranking";
+import type { GmFinalSummary } from "@/lib/game/services/get-gm-runtime-view";
 
 type GmScoreboardProps = {
   participants: GmRuntimeParticipant[];
+  sessionStatus: string;
+  finalSummary: GmFinalSummary;
 };
 
-export function GmScoreboard({ participants }: GmScoreboardProps) {
+export function GmScoreboard({ participants, sessionStatus, finalSummary }: GmScoreboardProps) {
   const sorted = buildLiveRanking(participants);
 
   return (
@@ -25,6 +28,21 @@ export function GmScoreboard({ participants }: GmScoreboardProps) {
           ))}
         </div>
       )}
+      {sessionStatus === "finished" ? (
+        <div className="space-y-2 rounded border border-emerald-700/70 bg-emerald-950/30 p-3 text-xs text-emerald-100">
+          <p className="font-semibold">Clôture finale (GM exclu du classement)</p>
+          <p>Vainqueur: {finalSummary.winner ? `#${finalSummary.winner.position} ${finalSummary.winner.displayName}` : "aucun"}</p>
+          <p>Podium: {finalSummary.podium.map((entry) => `${entry.position}. ${entry.displayName}`).join(" · ") || "n/a"}</p>
+          <p>Bottom 5: {finalSummary.bottomFive.map((entry) => `${entry.position}. ${entry.displayName}`).join(" · ") || "n/a"}</p>
+          <div className="space-y-1">
+            {finalSummary.ranking.map((entry) => (
+              <p key={entry.participantId}>
+                #{entry.position} {entry.displayName} · score={entry.currentScore} · tokens={entry.currentTokens}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

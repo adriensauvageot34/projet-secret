@@ -1,7 +1,7 @@
 # Architecture MVP
 
 ## Séparation catalogue / runtime
-- Catalogue: `levels`, `element_templates`, `advantage_templates`, `wheel_outcome_templates`.
+- Catalogue: `levels`, `element_templates`, `advantage_templates` (les tables roue restent legacy/non utilisées en runtime MVP).
 - Runtime: `participants`, `element_instances`, `advantage_instances`, `accusations`.
 
 ## Séparation identité / participation sessionnelle

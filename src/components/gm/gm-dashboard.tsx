@@ -44,27 +44,39 @@ export function GmDashboard() {
         isRefreshing={gm.isRefreshing}
         successMessage={gm.successMessage}
         actionError={gm.actionError}
+        isFinishing={gm.pendingActionKey === "finish-session"}
+        onFinishSession={() => void gm.finishSession()}
       />
       <GmParticipantList participants={gm.runtime.participants} />
       <GmActiveTicketQueue tickets={gm.runtime.activeGmTickets} />
       <GmLiveElements liveElements={gm.runtime.liveElements} />
-      <GmAccusationsQueue
-        accusations={gm.runtime.accusations}
-        participantOptions={participantOptions}
-        pendingActionKey={gm.pendingActionKey}
-        onCreate={gm.createAccusation}
-        onAdjudicate={gm.adjudicateAccusation}
+      {gm.runtime.session.status === "finished" ? (
+        <Card className="text-xs text-slate-300">Session terminée: actions GM gameplay verrouillées.</Card>
+      ) : (
+        <>
+          <GmAccusationsQueue
+            accusations={gm.runtime.accusations}
+            participantOptions={participantOptions}
+            pendingActionKey={gm.pendingActionKey}
+            onCreate={gm.createAccusation}
+            onAdjudicate={gm.adjudicateAccusation}
+          />
+          <GmDecisionsPanel
+            decisions={gm.runtime.decisions}
+            participantOptions={participantOptions}
+            accusationOptions={gm.runtime.accusations.map((accusation) => ({ id: accusation.id, label: accusation.justification }))}
+            pendingActionKey={gm.pendingActionKey}
+            onCreate={gm.createDecision}
+            onApply={gm.applyDecision}
+            onCancel={gm.cancelDecision}
+          />
+        </>
+      )}
+      <GmScoreboard
+        participants={gm.runtime.participants}
+        sessionStatus={gm.runtime.session.status}
+        finalSummary={gm.runtime.finalSummary}
       />
-      <GmDecisionsPanel
-        decisions={gm.runtime.decisions}
-        participantOptions={participantOptions}
-        accusationOptions={gm.runtime.accusations.map((accusation) => ({ id: accusation.id, label: accusation.justification }))}
-        pendingActionKey={gm.pendingActionKey}
-        onCreate={gm.createDecision}
-        onApply={gm.applyDecision}
-        onCancel={gm.cancelDecision}
-      />
-      <GmScoreboard participants={gm.runtime.participants} />
     </div>
   );
 }

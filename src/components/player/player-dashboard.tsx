@@ -41,39 +41,47 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
         actionError={runtime.actionError}
       />
       <PlayerRankStrip level={runtime.runtime.level} ranking={runtime.runtime.ranking} />
-      <ActiveElementsPanel
-        activeElements={runtime.runtime.activeElements}
-        pendingInstanceId={runtime.pendingInstanceId}
-        lastClaimFlowByInstanceId={runtime.lastClaimFlowByInstanceId}
-        onClaim={runtime.claimResult}
-      />
-      <ReservePanel
-        templates={runtime.runtime.reserveTemplates}
-        pendingTemplateId={runtime.pendingTemplateId}
-        onActivate={runtime.activateElement}
-      />
-      <ShopPanel
-        items={runtime.runtime.shop}
-        pendingTemplateId={runtime.pendingShopTemplateId}
-        onBuy={runtime.buyAdvantage}
-      />
-      <InventoryPanel
-        inventory={runtime.runtime.inventory}
-        targets={runtime.runtime.accusationTargets}
-        elementTargets={runtime.runtime.advantageElementTargets}
-        selfParticipantId={runtime.runtime.participant.id}
-        pendingAdvantageActionId={runtime.pendingAdvantageActionId}
-        onActivateAdvantage={runtime.activateAdvantage}
-        onUseAdvantage={runtime.useAdvantage}
-      />
-      <AccusationPanel
-        accusationTargets={runtime.runtime.accusationTargets}
-        accusableTemplates={runtime.runtime.accusableTemplates}
-        isPending={runtime.isCreatingAccusation}
-        actionError={runtime.actionError}
-        successMessage={runtime.successMessage}
-        onCreateAccusation={runtime.createAccusation}
-      />
+      {runtime.runtime.sessionStatus === "finished" ? (
+        <Card className="text-sm text-slate-200">
+          Partie terminée. Les actions gameplay sont verrouillées. Consulte ton score final et le classement.
+        </Card>
+      ) : (
+        <>
+          <ActiveElementsPanel
+            activeElements={runtime.runtime.activeElements}
+            pendingInstanceId={runtime.pendingInstanceId}
+            lastClaimFlowByInstanceId={runtime.lastClaimFlowByInstanceId}
+            onClaim={runtime.claimResult}
+          />
+          <ReservePanel
+            templates={runtime.runtime.reserveTemplates}
+            pendingTemplateId={runtime.pendingTemplateId}
+            onActivate={runtime.activateElement}
+          />
+          <ShopPanel
+            items={runtime.runtime.shop}
+            pendingTemplateId={runtime.pendingShopTemplateId}
+            onBuy={runtime.buyAdvantage}
+          />
+          <InventoryPanel
+            inventory={runtime.runtime.inventory}
+            targets={runtime.runtime.accusationTargets}
+            elementTargets={runtime.runtime.advantageElementTargets}
+            selfParticipantId={runtime.runtime.participant.id}
+            pendingAdvantageActionId={runtime.pendingAdvantageActionId}
+            onActivateAdvantage={runtime.activateAdvantage}
+            onUseAdvantage={runtime.useAdvantage}
+          />
+          <AccusationPanel
+            accusationTargets={runtime.runtime.accusationTargets}
+            accusableTemplates={runtime.runtime.accusableTemplates}
+            isPending={runtime.isCreatingAccusation}
+            actionError={runtime.actionError}
+            successMessage={runtime.successMessage}
+            onCreateAccusation={runtime.createAccusation}
+          />
+        </>
+      )}
     </>
   );
 }

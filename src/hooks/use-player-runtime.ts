@@ -63,6 +63,7 @@ export type PlayerAdvantageElementTarget = {
 
 export type PlayerRuntimeData = {
   participant: Participant;
+  sessionStatus: "preparation" | "live" | "finished" | "archived";
   level: {
     id: string;
     levelNumber: number;
@@ -216,7 +217,13 @@ export function usePlayerRuntime(participantId: string) {
     return () => clearInterval(timer);
   }, [loadRuntime]);
 
+  const isSessionFinished = runtime?.sessionStatus === "finished";
+
   const activateElement = useCallback(async (templateId: string) => {
+    if (isSessionFinished) {
+      setActionError("Session terminée : actions gameplay verrouillées.");
+      return;
+    }
     try {
       setPendingTemplateId(templateId);
       setActionError(null);
@@ -234,9 +241,13 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingTemplateId(null);
     }
-  }, [loadRuntime, participantId]);
+  }, [isSessionFinished, loadRuntime, participantId]);
 
   const claimResult = useCallback(async (instanceId: string, claimedResult: ClaimedResult) => {
+    if (isSessionFinished) {
+      setActionError("Session terminée : actions gameplay verrouillées.");
+      return;
+    }
     try {
       setPendingInstanceId(instanceId);
       setActionError(null);
@@ -261,9 +272,13 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingInstanceId(null);
     }
-  }, [loadRuntime]);
+  }, [isSessionFinished, loadRuntime]);
 
   const buyAdvantage = useCallback(async (templateId: string) => {
+    if (isSessionFinished) {
+      setActionError("Session terminée : actions gameplay verrouillées.");
+      return;
+    }
     try {
       setPendingShopTemplateId(templateId);
       setActionError(null);
@@ -281,7 +296,7 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingShopTemplateId(null);
     }
-  }, [loadRuntime, participantId]);
+  }, [isSessionFinished, loadRuntime, participantId]);
 
   const createAccusation = useCallback(async (params: {
     accusedParticipantId: string;
@@ -289,6 +304,11 @@ export function usePlayerRuntime(participantId: string) {
     suspectedTemplateId: string;
     justification: string;
   }): Promise<Accusation> => {
+    if (isSessionFinished) {
+      const message = "Session terminée : actions gameplay verrouillées.";
+      setActionError(message);
+      throw new Error(message);
+    }
     try {
       setIsCreatingAccusation(true);
       setActionError(null);
@@ -314,13 +334,17 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setIsCreatingAccusation(false);
     }
-  }, [loadRuntime, participantId, runtime?.participant.session_id]);
+  }, [isSessionFinished, loadRuntime, participantId, runtime?.participant.session_id]);
 
   const activateAdvantage = useCallback(async (params: {
     advantageInstanceId: string;
     targetParticipantId?: string | null;
     targetElementInstanceId?: string | null;
   }) => {
+    if (isSessionFinished) {
+      setActionError("Session terminée : actions gameplay verrouillées.");
+      return;
+    }
     try {
       setPendingAdvantageActionId(params.advantageInstanceId);
       setActionError(null);
@@ -339,13 +363,17 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingAdvantageActionId(null);
     }
-  }, [loadRuntime]);
+  }, [isSessionFinished, loadRuntime]);
 
   const useAdvantage = useCallback(async (params: {
     advantageInstanceId: string;
     targetElementInstanceId?: string | null;
     targetParticipantId?: string | null;
   }) => {
+    if (isSessionFinished) {
+      setActionError("Session terminée : actions gameplay verrouillées.");
+      return;
+    }
     try {
       setPendingAdvantageActionId(params.advantageInstanceId);
       setActionError(null);
@@ -367,7 +395,7 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingAdvantageActionId(null);
     }
-  }, [loadRuntime]);
+  }, [isSessionFinished, loadRuntime]);
 
   return useMemo(() => ({
     runtime,

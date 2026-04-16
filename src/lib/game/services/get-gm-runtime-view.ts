@@ -3,6 +3,7 @@ import { getCurrentSession } from "@/lib/db/queries/sessions";
 import { listAccusations, type AccusationDetail } from "@/lib/db/queries/accusations";
 import { listGMDecisions, type GMDecisionDetail } from "@/lib/db/queries/gm-decisions";
 import { isGmTicketEffectCode } from "@/lib/game/gm-ticket-advantages";
+import { buildLiveRanking, type LiveRankingEntry } from "@/lib/game/services/live-ranking";
 import type { Participant, Session } from "@/types/domain";
 
 export type GmRuntimeParticipant = Pick<
@@ -41,11 +42,30 @@ export type GmRuntimeElement = {
 export type GmRuntimeData = {
   session: Session;
   participants: GmRuntimeParticipant[];
+  finalSummary: GmFinalSummary;
   accusations: AccusationDetail[];
   decisions: GMDecisionDetail[];
   liveElements: GmRuntimeElement[];
   activeGmTickets: GmRuntimeActiveTicket[];
 };
+
+export type GmFinalSummary = {
+  ranking: LiveRankingEntry[];
+  winner: LiveRankingEntry | null;
+  podium: LiveRankingEntry[];
+  bottomFive: LiveRankingEntry[];
+};
+
+export function buildGmFinalSummary(participants: GmRuntimeParticipant[]): GmFinalSummary {
+  const ranking = buildLiveRanking(participants.filter((participant) => participant.role !== "gm"));
+
+  return {
+    ranking,
+    winner: ranking[0] ?? null,
+    podium: ranking.slice(0, 3),
+    bottomFive: ranking.slice(-5),
+  };
+}
 
 export type GmRuntimeActiveTicket = {
   id: string;
@@ -213,6 +233,7 @@ export async function getGmRuntimeView(): Promise<GmRuntimeData> {
   return {
     session,
     participants,
+    finalSummary: buildGmFinalSummary(participants),
     accusations,
     decisions,
     liveElements,

@@ -24,6 +24,7 @@ import {
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { validateAdvantageTargeting } from "@/lib/game/rules/advantage-targeting";
 import { compensateLatestSkipPenalty, getLatestCompensableSkipPenalty } from "@/lib/game/services/armed-advantages";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 import type { AdvantageInstance, AdvantageTemplate } from "@/types/domain";
 import type { Level, Participant } from "@/types/domain";
 
@@ -120,6 +121,7 @@ async function buildPurchaseContext(
   if (!participant) {
     throw new Error("Participant not found");
   }
+  await assertSessionIsLiveById(participant.session_id);
 
   const template = await deps.loadTemplate(input.templateId);
 
@@ -152,6 +154,7 @@ export async function grantAdvantageToParticipant(input: {
   costPaid?: number;
   gmNotes?: string;
 }): Promise<AdvantageInstance> {
+  await assertSessionIsLiveById(input.sessionId);
   const template = await getAdvantageTemplateById(input.templateId);
 
   if (!template) {
@@ -208,6 +211,7 @@ export async function activateParticipantAdvantage(input: {
   if (!instance) {
     throw new Error("Advantage instance not found");
   }
+  await assertSessionIsLiveById(instance.session_id);
 
   const activationCheck = canActivateAdvantageInstance(instance, { ...instance.template, is_active: true });
 
@@ -268,6 +272,7 @@ export async function applyAdvantageUse(input: {
   if (!instance) {
     throw new Error("Advantage instance not found");
   }
+  await assertSessionIsLiveById(instance.session_id);
 
   const consumeCheck = canConsumeAdvantageUse(instance, { ...instance.template, is_active: true });
 

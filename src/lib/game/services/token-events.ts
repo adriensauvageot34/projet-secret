@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { TokenEvent } from "@/types/domain";
 import type { TokenEventType } from "@/lib/game/enums";
 import { enrichTokenEventRow, getTokenEventById } from "@/lib/db/queries/token-events";
+import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 
 const createTokenEventSchema = z.object({
   participantId: z.string().uuid(),
@@ -113,6 +114,7 @@ export async function reconcileParticipantCurrentTokens(participantId: string): 
 }
 
 async function validateCreateInput(payload: CreateTokenEventPayload): Promise<void> {
+  await assertSessionIsLiveById(payload.sessionId);
   assertEventTypeDeltaConsistency(payload.eventType, payload.deltaTokens);
 
   const supabase = createServerSupabaseClient();
