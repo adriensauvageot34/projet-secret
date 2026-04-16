@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const result = await activateElement(
       body.participantId,
       body.templateId,
-      body.slotIndex ?? 0,
+      body.slotIndex,
       body.isFake ?? false,
     );
 
