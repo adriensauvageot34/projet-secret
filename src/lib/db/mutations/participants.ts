@@ -1,5 +1,5 @@
 import type { ParticipantRole, ParticipantStatus } from "@/lib/game/enums";
-import type { Participant, Player } from "@/types/domain";
+import type { Level, Participant, Player } from "@/types/domain";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createTokenEvent } from "@/lib/game/services/token-events";
 import { createScoreEvent } from "@/lib/game/services/score-events";
@@ -71,20 +71,39 @@ export async function addTokens(participantId: string, delta: number, reason: st
 export async function computeLevelFromScore(score: number): Promise<string | null> {
   const supabase = createServerSupabaseClient();
 
-  const { data: level, error } = await supabase
+  const { data: levels, error } = await supabase
     .from("levels")
-    .select("id")
+    .select("id, min_score, max_score, level_number")
     .lte("min_score", score)
     .gte("max_score", score)
-    .order("visible_order", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("level_number", { ascending: true });
 
   if (error) {
     throw new Error(`Failed to compute level from score: ${error.message}`);
   }
 
-  return level?.id ?? null;
+  return pickLevelIdForScore(
+    score,
+    ((levels ?? []) as Array<Pick<Level, "id" | "min_score" | "max_score" | "level_number">>),
+  );
+}
+
+export function pickLevelIdForScore(
+  score: number,
+  levels: Array<Pick<Level, "id" | "min_score" | "max_score" | "level_number">>,
+): string | null {
+  const matchingLevels = levels.filter((level) => level.min_score <= score && level.max_score >= score);
+
+  if (matchingLevels.length === 0) {
+    return null;
+  }
+
+  if (matchingLevels.length > 1) {
+    const overlappingLevels = matchingLevels.map((level) => `${level.level_number}:${level.min_score}-${level.max_score}`).join(", ");
+    throw new Error(`Overlapping levels for score ${score}: ${overlappingLevels}`);
+  }
+
+  return matchingLevels[0]?.id ?? null;
 }
 
 export async function updateParticipantLevel(participantId: string): Promise<string | null> {

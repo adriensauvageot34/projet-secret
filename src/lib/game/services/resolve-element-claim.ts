@@ -25,9 +25,14 @@ type ResolveElementClaimDependencies = {
     notes?: string;
   }) => Promise<unknown>;
   listResolutionScoreEvents: (instanceId: string) => Promise<ScoreEventType[]>;
+  getLatestSuccessScoreEventType: (
+    participantId: string,
+    excludedElementInstanceId: string,
+  ) => Promise<Extract<ScoreEventType, "mission_success" | "constraint_success"> | null>;
   recomputeParticipantSlots: (participantId: string) => Promise<unknown>;
   updateCombo: (participantId: string, success: boolean) => Promise<number>;
   updateParticipantLevel: (participantId: string) => Promise<string | null>;
+  now: () => Date;
 };
 
 export type ElementClaimFlow = "auto_resolved" | "proof_pending" | "gm_pending";
@@ -45,6 +50,9 @@ const RESOLUTION_SCORE_EVENTS: readonly ScoreEventType[] = [
   "constraint_success",
   "skip_penalty",
   "constraint_break_penalty",
+  "combo_2",
+  "combo_3",
+  "mission_constraint_bonus",
 ] as const;
 
 const defaultDependencies: ResolveElementClaimDependencies = {
@@ -58,9 +66,26 @@ const defaultDependencies: ResolveElementClaimDependencies = {
       .map((event) => event.event_type)
       .filter((eventType): eventType is ScoreEventType => RESOLUTION_SCORE_EVENTS.includes(eventType));
   },
+  getLatestSuccessScoreEventType: async (participantId, excludedElementInstanceId) => {
+    const [missionEvents, constraintEvents] = await Promise.all([
+      listScoreEvents({ participantId, eventType: "mission_success" }),
+      listScoreEvents({ participantId, eventType: "constraint_success" }),
+    ]);
+
+    const latestSuccess = [...missionEvents, ...constraintEvents]
+      .filter((event) => event.related_element_instance_id !== excludedElementInstanceId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+
+    if (!latestSuccess) {
+      return null;
+    }
+
+    return latestSuccess.event_type === "mission_success" ? "mission_success" : "constraint_success";
+  },
   recomputeParticipantSlots,
   updateCombo,
   updateParticipantLevel,
+  now: () => new Date(),
 };
 
 function assertTemplate(template: ElementTemplate | null, templateId: string): ElementTemplate {
@@ -73,6 +98,22 @@ function assertTemplate(template: ElementTemplate | null, templateId: string): E
 
 function mapClaimedToFinalResult(claimedResult: ClaimedResult): FinalResult {
   return claimedResult;
+}
+
+function assertNotAlreadyFinalized(instance: Pick<ElementInstance, "final_result">): void {
+  if (instance.final_result !== null) {
+    throw new Error("Element instance is already terminally resolved");
+  }
+}
+
+function assertSkipAvailable(instance: Pick<ElementInstance, "skip_available_at">, now: Date): void {
+  if (!instance.skip_available_at) {
+    throw new Error("Skip is not available for this element instance");
+  }
+
+  if (new Date(instance.skip_available_at).getTime() > now.getTime()) {
+    throw new Error("Skip is not available yet");
+  }
 }
 
 function computeSkippedCooldownMinutes(template: ClaimTemplateContext): number {
@@ -100,28 +141,97 @@ function computeResolutionDeltaPoints(template: ClaimTemplateContext, eventType:
   return basePoints;
 }
 
+function isDuplicateResolutionScoreEventError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("duplicate key") || message.includes("unique constraint");
+}
+
+async function createInstanceBoundScoreEvent(
+  dependencies: ResolveElementClaimDependencies,
+  input: {
+    participantId: string;
+    sessionId: string;
+    relatedElementInstanceId: string;
+    eventType: ScoreEventType;
+    deltaPoints: number;
+  },
+): Promise<void> {
+  try {
+    await dependencies.createScoreEvent({
+      participantId: input.participantId,
+      sessionId: input.sessionId,
+      eventType: input.eventType,
+      deltaPoints: input.deltaPoints,
+      relatedElementInstanceId: input.relatedElementInstanceId,
+      notes: "auto_resolution",
+    });
+  } catch (error) {
+    if (!isDuplicateResolutionScoreEventError(error)) {
+      throw error;
+    }
+  }
+}
+
 async function applyFinalResolutionEffects(
   resolvedInstance: ElementInstance,
   template: ClaimTemplateContext,
   dependencies: ResolveElementClaimDependencies,
 ): Promise<void> {
-  const scoreEventType = createScoreEventFromInstance(resolvedInstance, template);
+  const existingScoreEventTypes = await dependencies.listResolutionScoreEvents(resolvedInstance.id);
+  const scoreEventType = resolvedInstance.is_fake ? null : createScoreEventFromInstance(resolvedInstance, template);
 
-  if (scoreEventType) {
-    const existingScoreEventTypes = await dependencies.listResolutionScoreEvents(resolvedInstance.id);
-    if (!existingScoreEventTypes.includes(scoreEventType)) {
-      await dependencies.createScoreEvent({
+  if (scoreEventType && !existingScoreEventTypes.includes(scoreEventType)) {
+    await createInstanceBoundScoreEvent(dependencies, {
+      participantId: resolvedInstance.participant_id,
+      sessionId: resolvedInstance.session_id,
+      eventType: scoreEventType,
+      deltaPoints: computeResolutionDeltaPoints(template, scoreEventType),
+      relatedElementInstanceId: resolvedInstance.id,
+    });
+  }
+
+  const comboCountsAsSuccess = resolvedInstance.final_result === "success" && !resolvedInstance.is_fake;
+  const nextCombo = await dependencies.updateCombo(resolvedInstance.participant_id, comboCountsAsSuccess);
+  const comboBonusesToApply: ScoreEventType[] = [];
+
+  if (comboCountsAsSuccess) {
+    if (nextCombo === 2) {
+      comboBonusesToApply.push("combo_2");
+
+      const latestSuccessType = await dependencies.getLatestSuccessScoreEventType(
+        resolvedInstance.participant_id,
+        resolvedInstance.id,
+      );
+
+      if (
+        (scoreEventType === "mission_success" && latestSuccessType === "constraint_success")
+        || (scoreEventType === "constraint_success" && latestSuccessType === "mission_success")
+      ) {
+        comboBonusesToApply.push("mission_constraint_bonus");
+      }
+    }
+
+    if (nextCombo === 3) {
+      comboBonusesToApply.push("combo_3");
+    }
+  }
+
+  for (const bonusEventType of comboBonusesToApply) {
+    if (!existingScoreEventTypes.includes(bonusEventType)) {
+      await createInstanceBoundScoreEvent(dependencies, {
         participantId: resolvedInstance.participant_id,
         sessionId: resolvedInstance.session_id,
-        eventType: scoreEventType,
-        deltaPoints: computeResolutionDeltaPoints(template, scoreEventType),
+        eventType: bonusEventType,
+        deltaPoints: 1,
         relatedElementInstanceId: resolvedInstance.id,
-        notes: "auto_resolution",
       });
     }
   }
 
-  await dependencies.updateCombo(resolvedInstance.participant_id, resolvedInstance.final_result === "success");
   await dependencies.recomputeParticipantSlots(resolvedInstance.participant_id);
   await dependencies.updateParticipantLevel(resolvedInstance.participant_id);
 }
@@ -132,10 +242,16 @@ export async function resolveElementClaim(
   dependencies: ResolveElementClaimDependencies = defaultDependencies,
 ): Promise<ResolveElementClaimOutput> {
   const claimedInstance = await dependencies.claimResult(instanceId, claimedResult);
+  assertNotAlreadyFinalized(claimedInstance);
+
   const template = assertTemplate(
     await dependencies.getElementTemplateById(claimedInstance.element_template_id),
     claimedInstance.element_template_id,
   );
+
+  if (claimedResult === "skipped") {
+    assertSkipAvailable(claimedInstance, dependencies.now());
+  }
 
   const shouldAutoResolve = claimedResult === "skipped" || template.validation_mode === "auto";
 

@@ -39,8 +39,20 @@ function makeDeps(params: {
   templateElementType?: ElementTemplate["element_type"];
   templateBasePoints?: number;
   existingScoreEvents?: ScoreEventType[];
+  createScoreEventErrorMessage?: string;
+  updateComboReturn?: number;
+  latestSuccessScoreEventType?: "mission_success" | "constraint_success" | null;
+  nowIso?: string;
+  claimSkipAvailableAt?: string | null;
+  claimedFinalResult?: FinalResult | null;
+  resolvedIsFake?: boolean;
 }) {
-  const claimedInstance = makeInstance({ claimed_result: params.claimResult });
+  const claimedInstance = makeInstance({
+    claimed_result: params.claimResult,
+    skip_available_at:
+      params.claimSkipAvailableAt === undefined ? "2026-01-01T00:03:00.000Z" : params.claimSkipAvailableAt,
+    final_result: params.claimedFinalResult ?? null,
+  });
   const resolveCalls: Array<{ finalResult: FinalResult; options?: { skippedCooldownMinutes?: number } }> = [];
   const createScoreEventCalls: Array<{ eventType: ScoreEventType; deltaPoints: number; relatedElementInstanceId: string }> = [];
   const updateComboCalls: boolean[] = [];
@@ -65,6 +77,7 @@ function makeDeps(params: {
         return makeInstance({
           claimed_result: params.claimResult,
           final_result: params.resolvedFinalResult ?? finalResult,
+          is_fake: params.resolvedIsFake ?? false,
           state:
             finalResult === "success"
               ? "completed"
@@ -83,6 +96,9 @@ function makeDeps(params: {
         deltaPoints: number;
         relatedElementInstanceId: string;
       }) => {
+        if (params.createScoreEventErrorMessage) {
+          throw new Error(params.createScoreEventErrorMessage);
+        }
         createScoreEventCalls.push({
           eventType: input.eventType,
           deltaPoints: input.deltaPoints,
@@ -91,17 +107,22 @@ function makeDeps(params: {
         return {};
       },
       listResolutionScoreEvents: async () => params.existingScoreEvents ?? [],
+      getLatestSuccessScoreEventType: async () => params.latestSuccessScoreEventType ?? null,
       recomputeParticipantSlots: async () => {
         recomputeParticipantSlotsCalls += 1;
       },
       updateCombo: async (_participantId: string, success: boolean) => {
         updateComboCalls.push(success);
+        if (params.updateComboReturn !== undefined) {
+          return params.updateComboReturn;
+        }
         return success ? 1 : 0;
       },
       updateParticipantLevel: async () => {
         updateParticipantLevelCalls += 1;
         return null;
       },
+      now: () => new Date(params.nowIso ?? "2026-01-01T00:05:00.000Z"),
     },
   };
 }
@@ -229,6 +250,33 @@ test("activation puis skipped => état cooldown + score_event penalty", async ()
   assert.deepEqual(updateComboCalls, [false]);
 });
 
+test("skip trop tôt => refusé avant skip_available_at", async () => {
+  const { deps } = makeDeps({
+    claimResult: "skipped",
+    validationMode: "gm",
+    nowIso: "2026-01-01T00:02:00.000Z",
+    claimSkipAvailableAt: "2026-01-01T00:03:00.000Z",
+  });
+
+  await assert.rejects(
+    () => resolveElementClaim("instance-1", "skipped", deps),
+    /Skip is not available yet/,
+  );
+});
+
+test("skip sans skip_available_at => refusé", async () => {
+  const { deps } = makeDeps({
+    claimResult: "skipped",
+    validationMode: "gm",
+    claimSkipAvailableAt: null,
+  });
+
+  await assert.rejects(
+    () => resolveElementClaim("instance-1", "skipped", deps),
+    /Skip is not available for this element instance/,
+  );
+});
+
 test("claim proof pending => claimed_result oui, final_result non, score non modifié", async () => {
   const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
     claimResult: "success",
@@ -267,6 +315,25 @@ test("claim gm pending => claimed_result oui, final_result non, score non modifi
   assert.equal(getUpdateParticipantLevelCalls(), 0);
 });
 
+test("claim refusé si instance déjà terminalement résolue", async () => {
+  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    claimedFinalResult: "success",
+  });
+
+  await assert.rejects(
+    () => resolveElementClaim("instance-1", "success", deps),
+    /already terminally resolved/,
+  );
+
+  assert.equal(resolveCalls.length, 0);
+  assert.equal(createScoreEventCalls.length, 0);
+  assert.equal(updateComboCalls.length, 0);
+  assert.equal(getRecomputeParticipantSlotsCalls(), 0);
+  assert.equal(getUpdateParticipantLevelCalls(), 0);
+});
+
 test("pas de double score_event si déjà présent pour l'instance", async () => {
   const { deps, createScoreEventCalls } = makeDeps({
     claimResult: "success",
@@ -278,4 +345,96 @@ test("pas de double score_event si déjà présent pour l'instance", async () =>
 
   assert.equal(result.finalResolved, true);
   assert.equal(createScoreEventCalls.length, 0);
+});
+
+test("écriture score idempotente: ignore duplicate key et continue les effets runtime", async () => {
+  const { deps, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    createScoreEventErrorMessage: "duplicate key value violates unique constraint",
+  });
+
+  const result = await resolveElementClaim("instance-1", "success", deps);
+
+  assert.equal(result.finalResolved, true);
+  assert.deepEqual(updateComboCalls, [true]);
+  assert.equal(getRecomputeParticipantSlotsCalls(), 1);
+  assert.equal(getUpdateParticipantLevelCalls(), 1);
+});
+
+test("combo_2: deuxième réussite consécutive attribue combo_2", async () => {
+  const { deps, createScoreEventCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    templateElementType: "mission",
+    updateComboReturn: 2,
+    latestSuccessScoreEventType: "mission_success",
+  });
+
+  await resolveElementClaim("instance-1", "success", deps);
+
+  assert.deepEqual(createScoreEventCalls.map((call) => call.eventType), [
+    "mission_success",
+    "combo_2",
+  ]);
+});
+
+test("combo_3: troisième réussite consécutive attribue combo_3", async () => {
+  const { deps, createScoreEventCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    templateElementType: "mission",
+    updateComboReturn: 3,
+  });
+
+  await resolveElementClaim("instance-1", "success", deps);
+
+  assert.deepEqual(createScoreEventCalls.map((call) => call.eventType), [
+    "mission_success",
+    "combo_3",
+  ]);
+});
+
+test("reset combo: une non-réussite ne crée aucun bonus combo", async () => {
+  const { deps, createScoreEventCalls, updateComboCalls } = makeDeps({
+    claimResult: "fail",
+    validationMode: "auto",
+  });
+
+  await resolveElementClaim("instance-1", "fail", deps);
+
+  assert.deepEqual(updateComboCalls, [false]);
+  assert.deepEqual(createScoreEventCalls, []);
+});
+
+test("bonus mission+contrainte: attribué uniquement à la bonne fenêtre (streak=2 et types complémentaires)", async () => {
+  const { deps, createScoreEventCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    templateElementType: "constraint",
+    updateComboReturn: 2,
+    latestSuccessScoreEventType: "mission_success",
+  });
+
+  await resolveElementClaim("instance-1", "success", deps);
+
+  assert.deepEqual(createScoreEventCalls.map((call) => call.eventType), [
+    "constraint_success",
+    "combo_2",
+    "mission_constraint_bonus",
+  ]);
+});
+
+test("faux élément: une exécution simple ne produit aucun score_event ni bonus combo", async () => {
+  const { deps, createScoreEventCalls, updateComboCalls } = makeDeps({
+    claimResult: "success",
+    validationMode: "auto",
+    templateElementType: "mission",
+    resolvedIsFake: true,
+  });
+
+  await resolveElementClaim("instance-1", "success", deps);
+
+  assert.deepEqual(createScoreEventCalls, []);
+  assert.deepEqual(updateComboCalls, [false]);
 });

@@ -19,7 +19,7 @@ const GM_ID = "00000000-0000-0000-0000-000000000004";
 const TEMPLATE_ID = "00000000-0000-0000-0000-000000000005";
 const ACCUSATION_ID = "00000000-0000-0000-0000-000000000006";
 
-function makeParticipant(id: string): Participant {
+function makeParticipant(id: string, overrides: Partial<Participant> = {}): Participant {
   return {
     id,
     session_id: SESSION_ID,
@@ -39,6 +39,7 @@ function makeParticipant(id: string): Participant {
     blocked_slot_count: 0,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
+    ...overrides,
   };
 }
 
@@ -238,7 +239,7 @@ test("MVP flow: adjudication correct creates one accusation_correct token_event"
     },
     {
       getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation()),
-      loadParticipantById: async () => makeParticipant(GM_ID),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
       updateAccusationRow: async () => {
         updated = true;
         return finalDetail;
@@ -309,6 +310,64 @@ test("guardrail: template type mismatch is rejected", async () => {
   );
 });
 
+test("guardrail: related_element_instance must belong to accused participant", async () => {
+  await assert.rejects(() =>
+    createAccusation(
+      {
+        sessionId: SESSION_ID,
+        accuserParticipantId: ACCUSER_ID,
+        accusedParticipantId: ACCUSED_ID,
+        suspectedType: "mission",
+        suspectedTemplateId: TEMPLATE_ID,
+        relatedElementInstanceId: "00000000-0000-0000-0000-000000000099",
+        justification: "mauvais owner",
+      },
+      {
+        loadParticipantById: async (id) => makeParticipant(id),
+        loadTemplateById: async () => makeTemplate("mission"),
+        loadElementInstanceById: async () =>
+          ({
+            id: "00000000-0000-0000-0000-000000000099",
+            session_id: SESSION_ID,
+            participant_id: ACCUSER_ID,
+            element_template_id: TEMPLATE_ID,
+          }) as never,
+        createAccusationRow: async () => ({ id: ACCUSATION_ID } as never),
+        getAccusationDetailById: async () => makeAccusation(),
+      },
+    ),
+  );
+});
+
+test("guardrail: related_element_instance must match suspected_template_id", async () => {
+  await assert.rejects(() =>
+    createAccusation(
+      {
+        sessionId: SESSION_ID,
+        accuserParticipantId: ACCUSER_ID,
+        accusedParticipantId: ACCUSED_ID,
+        suspectedType: "mission",
+        suspectedTemplateId: TEMPLATE_ID,
+        relatedElementInstanceId: "00000000-0000-0000-0000-000000000099",
+        justification: "mauvais template",
+      },
+      {
+        loadParticipantById: async (id) => makeParticipant(id),
+        loadTemplateById: async () => makeTemplate("mission"),
+        loadElementInstanceById: async () =>
+          ({
+            id: "00000000-0000-0000-0000-000000000099",
+            session_id: SESSION_ID,
+            participant_id: ACCUSED_ID,
+            element_template_id: "00000000-0000-0000-0000-000000000088",
+          }) as never,
+        createAccusationRow: async () => ({ id: ACCUSATION_ID } as never),
+        getAccusationDetailById: async () => makeAccusation(),
+      },
+    ),
+  );
+});
+
 test("adjudication not_receivable maps to rejected/irrecevable without reward token event", async () => {
   let tokenEventCalls = 0;
   let updated = false;
@@ -328,7 +387,7 @@ test("adjudication not_receivable maps to rejected/irrecevable without reward to
     },
     {
       getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation()),
-      loadParticipantById: async () => makeParticipant(GM_ID),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
       updateAccusationRow: async () => {
         updated = true;
         return finalDetail;
@@ -349,6 +408,28 @@ test("adjudication not_receivable maps to rejected/irrecevable without reward to
   assert.equal(tokenEventCalls, 0);
 });
 
+test("guardrail: adjudication must be performed by a GM participant", async () => {
+  await assert.rejects(() =>
+    adjudicateAccusation(
+      {
+        accusationId: ACCUSATION_ID,
+        sessionId: SESSION_ID,
+        adjudicatedByParticipantId: GM_ID,
+        decision: "incorrect",
+      },
+      {
+        getAccusationDetailById: async () => makeAccusation(),
+        loadParticipantById: async () => makeParticipant(GM_ID, { role: "player" }),
+        updateAccusationRow: async () => makeAccusation() as never,
+        createTokenEventEntry: async () => ({ id: "evt" } as never),
+        createScoreEventEntry: async () => ({ id: "score" } as never),
+        createArbitrationDecision: async () => undefined,
+        hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      },
+    ),
+  );
+});
+
 test("guardrail: second adjudication with different decision is rejected", async () => {
   await assert.rejects(() =>
     adjudicateAccusation(
@@ -367,7 +448,7 @@ test("guardrail: second adjudication with different decision is rejected", async
             adjudicated_by_participant_id: GM_ID,
             adjudicated_at: "2026-01-01T00:00:00.000Z",
           }),
-        loadParticipantById: async () => makeParticipant(GM_ID),
+        loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
         updateAccusationRow: async () => makeAccusation(),
         createTokenEventEntry: async () => ({ id: "evt" } as never),
         createScoreEventEntry: async () => ({ id: "score" } as never),
@@ -398,7 +479,7 @@ test("guardrail: no duplicate reward when correct adjudication is replayed after
     },
     {
       getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation()),
-      loadParticipantById: async () => makeParticipant(GM_ID),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
       updateAccusationRow: async () => {
         updated = true;
         return finalDetail;
@@ -414,4 +495,109 @@ test("guardrail: no duplicate reward when correct adjudication is replayed after
   );
 
   assert.equal(tokenEventCalls, 0);
+});
+
+test("idempotence: duplicate token reward write does not break adjudication result", async () => {
+  let updated = false;
+  const finalDetail = makeAccusation({
+    status: "validated",
+    decision: "correct",
+    verdict: "juste",
+    reward_tokens: 1,
+    is_receivable: true,
+  });
+
+  const result = await adjudicateAccusation(
+    {
+      accusationId: ACCUSATION_ID,
+      sessionId: SESSION_ID,
+      adjudicatedByParticipantId: GM_ID,
+      decision: "correct",
+      rewardTokens: 1,
+    },
+    {
+      getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation()),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+      updateAccusationRow: async () => {
+        updated = true;
+        return finalDetail;
+      },
+      createTokenEventEntry: async () => {
+        throw new Error("duplicate key value violates unique constraint");
+      },
+      createScoreEventEntry: async () => ({ id: "score" } as never),
+      createArbitrationDecision: async () => undefined,
+      hasAccusationCorrectRewardTokenEventEntry: async () => false,
+    },
+  );
+
+  assert.equal(result.status, "validated");
+  assert.equal(result.decision, "correct");
+  assert.equal(result.reward_tokens, 1);
+});
+
+test("fake bait: applique bonus MVP +5 score / +2 jetons pour l'accusé", async () => {
+  const tokenCalls: Array<{ deltaTokens: number }> = [];
+  const scoreCalls: Array<{ deltaPoints: number }> = [];
+  let updated = false;
+  const finalDetail = makeAccusation({
+    status: "validated",
+    decision: "fake_bait_triggered",
+    verdict: "juste",
+    triggered_fake_bait: true,
+    related_element_is_fake: true,
+  });
+
+  await adjudicateAccusation(
+    {
+      accusationId: ACCUSATION_ID,
+      sessionId: SESSION_ID,
+      adjudicatedByParticipantId: GM_ID,
+      decision: "fake_bait_triggered",
+    },
+    {
+      getAccusationDetailById: async () =>
+        (updated ? finalDetail : makeAccusation({ related_element_is_fake: true, related_element_instance_id: "instance-fake-1" })),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+      updateAccusationRow: async () => {
+        updated = true;
+        return finalDetail;
+      },
+      createTokenEventEntry: async (input) => {
+        tokenCalls.push({ deltaTokens: input.deltaTokens });
+        return { id: "evt" } as never;
+      },
+      createScoreEventEntry: async (input) => {
+        scoreCalls.push({ deltaPoints: input.deltaPoints });
+        return { id: "score" } as never;
+      },
+      createArbitrationDecision: async () => undefined,
+      hasAccusationCorrectRewardTokenEventEntry: async () => false,
+    },
+  );
+
+  assert.deepEqual(tokenCalls, [{ deltaTokens: 2 }]);
+  assert.deepEqual(scoreCalls, [{ deltaPoints: 5 }]);
+});
+
+test("fake bait: rejeté si l'accusation n'est pas liée à un faux élément", async () => {
+  await assert.rejects(() =>
+    adjudicateAccusation(
+      {
+        accusationId: ACCUSATION_ID,
+        sessionId: SESSION_ID,
+        adjudicatedByParticipantId: GM_ID,
+        decision: "fake_bait_triggered",
+      },
+      {
+        getAccusationDetailById: async () => makeAccusation({ related_element_is_fake: false }),
+        loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+        updateAccusationRow: async () => makeAccusation() as never,
+        createTokenEventEntry: async () => ({ id: "evt" } as never),
+        createScoreEventEntry: async () => ({ id: "score" } as never),
+        createArbitrationDecision: async () => undefined,
+        hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      },
+    ),
+  );
 });

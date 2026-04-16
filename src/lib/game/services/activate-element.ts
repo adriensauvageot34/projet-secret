@@ -5,19 +5,19 @@ import type { ElementInstance, ElementTemplate, Level, Participant, Session } fr
 
 type ActivationParticipant = Pick<Participant, "id" | "session_id" | "mission_slot_max" | "constraint_slot_max" | "current_level_id">;
 type ActivationSession = Pick<Session, "id" | "max_active_missions" | "max_active_constraints">;
-type ActivationLevel = Pick<Level, "id" | "mission_difficulty_max" | "constraint_difficulty_max">;
+type ActivationLevel = Pick<Level, "id" | "level_number" | "mission_difficulty_max" | "constraint_difficulty_max">;
 type ActivationTemplate = Pick<
   ElementTemplate,
   "id" | "element_type" | "difficulty" | "duration_seconds" | "skip_unlock_rule" | "proof_required" | "is_active" | "can_appear_in_reserve" | "can_be_fake"
 >;
-type ActiveSlotRow = { active_slot_index: number | null };
+type OccupiedSlotRow = { active_slot_index: number | null; state: ElementInstance["state"]; cooldown_until: string | null };
 
 type ActivationPlanInput = {
   participant: ActivationParticipant;
   session: ActivationSession;
   template: ActivationTemplate;
   level: ActivationLevel | null;
-  activeSlots: ActiveSlotRow[];
+  occupiedSlots: OccupiedSlotRow[];
   requestedSlotIndex?: number;
   isFake: boolean;
   now: Date;
@@ -36,7 +36,7 @@ type ActivateElementDeps = {
   loadSession: (sessionId: string) => Promise<ActivationSession | null>;
   loadTemplate: (templateId: string) => Promise<ActivationTemplate | null>;
   loadLevel: (levelId: string) => Promise<ActivationLevel | null>;
-  listActiveSlots: (participantId: string, elementType: ElementTemplate["element_type"]) => Promise<ActiveSlotRow[]>;
+  listOccupiedSlots: (participantId: string, elementType: ElementTemplate["element_type"]) => Promise<OccupiedSlotRow[]>;
   createInstance: (input: {
     participantId: string;
     sessionId: string;
@@ -80,19 +80,48 @@ function computeTypeSlotLimit(
   session: ActivationSession,
   template: ActivationTemplate,
 ): number {
+  const mvpHardCapPerType = 2;
+
   if (template.element_type === "mission") {
-    return Math.min(participant.mission_slot_max, session.max_active_missions);
+    return Math.min(participant.mission_slot_max, session.max_active_missions, mvpHardCapPerType);
   }
 
-  return Math.min(participant.constraint_slot_max, session.max_active_constraints);
+  return Math.min(participant.constraint_slot_max, session.max_active_constraints, mvpHardCapPerType);
 }
 
-function resolveSlotIndex(activeSlots: ActiveSlotRow[], slotLimit: number, requestedSlotIndex?: number): number {
+function resolveSlotIndex(
+  occupiedSlots: OccupiedSlotRow[],
+  slotLimit: number,
+  now: Date,
+  requestedSlotIndex?: number,
+): number {
   if (slotLimit <= 0) {
     throw new Error("No active slot available for this element type");
   }
 
-  const occupied = new Set(activeSlots.map((row) => row.active_slot_index).filter((value): value is number => value !== null));
+  const occupied = new Set(
+    occupiedSlots
+      .filter((row) => {
+        if (row.active_slot_index === null) {
+          return false;
+        }
+
+        if (row.state === "active") {
+          return true;
+        }
+
+        if (row.state !== "cooldown") {
+          return false;
+        }
+
+        if (!row.cooldown_until) {
+          return true;
+        }
+
+        return new Date(row.cooldown_until).getTime() > now.getTime();
+      })
+      .map((row) => row.active_slot_index as number),
+  );
 
   if (requestedSlotIndex !== undefined) {
     if (!Number.isInteger(requestedSlotIndex) || requestedSlotIndex < 0 || requestedSlotIndex >= slotLimit) {
@@ -117,12 +146,16 @@ export function buildActivationPlan(input: ActivationPlanInput): ActivationPlan 
   assertEligibleTemplate(input.template);
   assertTemplateLevelEligibility(input.template, input.level);
 
+  if (input.isFake && input.level && input.level.level_number < 3) {
+    throw new Error("Fake elements unlock at level 3");
+  }
+
   if (input.isFake && !input.template.can_be_fake) {
     throw new Error("Template cannot be activated as fake");
   }
 
   const slotLimit = computeTypeSlotLimit(input.participant, input.session, input.template);
-  const slotIndex = resolveSlotIndex(input.activeSlots, slotLimit, input.requestedSlotIndex);
+  const slotIndex = resolveSlotIndex(input.occupiedSlots, slotLimit, input.now, input.requestedSlotIndex);
 
   const activatedAt = input.now.toISOString();
   const endsAt = getEndTime(input.template, input.now).toISOString();
@@ -185,7 +218,7 @@ function createDefaultDeps(): ActivateElementDeps {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase
         .from("levels")
-        .select("id, mission_difficulty_max, constraint_difficulty_max")
+        .select("id, level_number, mission_difficulty_max, constraint_difficulty_max")
         .eq("id", levelId)
         .maybeSingle();
 
@@ -195,20 +228,20 @@ function createDefaultDeps(): ActivateElementDeps {
 
       return (data as ActivationLevel | null) ?? null;
     },
-    listActiveSlots: async (participantId, elementType) => {
+    listOccupiedSlots: async (participantId, elementType) => {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase
         .from("element_instances")
-        .select("active_slot_index, element_templates!inner(element_type)")
+        .select("active_slot_index, state, cooldown_until, element_templates!inner(element_type)")
         .eq("participant_id", participantId)
-        .eq("state", "active")
+        .in("state", ["active", "cooldown"])
         .eq("element_templates.element_type", elementType);
 
       if (error) {
         throw new Error(`Failed to load active slots for activation: ${error.message}`);
       }
 
-      return (data as ActiveSlotRow[] | null) ?? [];
+      return (data as OccupiedSlotRow[] | null) ?? [];
     },
     createInstance: async (input) =>
       createElementInstance({
@@ -252,14 +285,14 @@ export async function activateElement(
   }
 
   const level = participant.current_level_id ? await deps.loadLevel(participant.current_level_id) : null;
-  const activeSlots = await deps.listActiveSlots(participant.id, template.element_type);
+  const occupiedSlots = await deps.listOccupiedSlots(participant.id, template.element_type);
 
   const plan = buildActivationPlan({
     participant,
     session,
     template,
     level,
-    activeSlots,
+    occupiedSlots,
     requestedSlotIndex: slotIndex,
     isFake,
     now: deps.now(),

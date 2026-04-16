@@ -99,3 +99,39 @@ test("submit-proof refusé si mode validation != proof", async () => {
     /only available for proof validation mode/,
   );
 });
+
+test("submit-proof refusé tant que claimed_result est absent", async () => {
+  await assert.rejects(
+    () =>
+      submitProof("instance-1", {
+        getElementInstanceById: async () => makeInstance({ claimed_result: null, proof_status: "pending" }),
+        getElementTemplateById: async () => makeTemplate("proof"),
+        submitProof: async () => makeInstance({ proof_status: "provided" }),
+      }),
+    /before claiming a result/,
+  );
+});
+
+test("submit-proof refusé si instance déjà résolue (final_result posé)", async () => {
+  await assert.rejects(
+    () =>
+      submitProof("instance-1", {
+        getElementInstanceById: async () => makeInstance({ final_result: "success", state: "completed", proof_status: "provided" }),
+        getElementTemplateById: async () => makeTemplate("proof"),
+        submitProof: async () => makeInstance({ proof_status: "provided" }),
+      }),
+    /resolved element instance/,
+  );
+});
+
+test("submit-proof refusé si proof_status=denied", async () => {
+  await assert.rejects(
+    () =>
+      submitProof("instance-1", {
+        getElementInstanceById: async () => makeInstance({ proof_status: "denied" }),
+        getElementTemplateById: async () => makeTemplate("proof"),
+        submitProof: async () => makeInstance({ proof_status: "provided" }),
+      }),
+    /already been denied/,
+  );
+});

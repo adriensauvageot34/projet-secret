@@ -9,6 +9,7 @@ import type {
   Participant,
 } from "@/types/domain";
 import type { ClaimedResult } from "@/lib/game/enums";
+import type { LiveRankingEntry } from "@/lib/game/services/live-ranking";
 
 export type PlayerActiveElement = {
   instance: ElementInstance;
@@ -49,6 +50,11 @@ export type PlayerRuntimeData = {
   activeElements: PlayerActiveElement[];
   shop: PlayerShopItem[];
   inventory: AdvantageInstanceWithTemplate[];
+  ranking: {
+    self: LiveRankingEntry;
+    above: LiveRankingEntry | null;
+    below: LiveRankingEntry | null;
+  };
 };
 
 function parseActionError(message: string): string {

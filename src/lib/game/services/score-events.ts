@@ -118,7 +118,7 @@ export async function reconcileParticipantCurrentScore(participantId: string): P
   return ledgerTotal;
 }
 
-async function validateCreateInput(payload: CreateScoreEventPayload): Promise<{ nextScore: number }> {
+async function validateCreateInput(payload: CreateScoreEventPayload): Promise<void> {
   assertScoreEventTypeDeltaConsistency(payload.eventType, payload.deltaPoints);
 
   const supabase = createServerSupabaseClient();
@@ -158,12 +158,12 @@ async function validateCreateInput(payload: CreateScoreEventPayload): Promise<{ 
     throw new Error("Score event would make participant.current_score negative");
   }
 
-  return { nextScore };
+  return;
 }
 
 export async function createScoreEvent(input: CreateScoreEventInput): Promise<ScoreEventDetail> {
   const payload = createScoreEventSchema.parse(input);
-  const { nextScore } = await validateCreateInput(payload);
+  await validateCreateInput(payload);
 
   const supabase = createServerSupabaseClient();
   const createdAt = toUtcISOString(payload.createdAt);
@@ -188,14 +188,7 @@ export async function createScoreEvent(input: CreateScoreEventInput): Promise<Sc
     throw new Error(`Failed to create score event: ${error?.message ?? "unknown error"}`);
   }
 
-  const { error: participantUpdateError } = await supabase
-    .from("participants")
-    .update({ current_score: nextScore })
-    .eq("id", payload.participantId);
-
-  if (participantUpdateError) {
-    throw new Error(`Failed to update participant.current_score: ${participantUpdateError.message}`);
-  }
+  await reconcileParticipantCurrentScore(payload.participantId);
 
   await updateParticipantLevel(payload.participantId);
 

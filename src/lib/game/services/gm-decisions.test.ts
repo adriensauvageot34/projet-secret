@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   assertMadeByParticipantSession,
   assertSameSession,
@@ -414,4 +415,13 @@ test("session coherence helpers reject cross-session links", () => {
       "s1",
     ),
   );
+});
+
+test("schema guardrail: unique manual_adjustment ledger event per GM decision", () => {
+  const migration = readFileSync("supabase/migrations/0018_gm_decision_ledger_uniqueness.sql", "utf8");
+
+  assert.match(migration, /create unique index if not exists uq_score_events_manual_adjustment_once_per_gm_decision/s);
+  assert.match(migration, /create unique index if not exists uq_token_events_manual_adjustment_once_per_gm_decision/s);
+  assert.match(migration, /related_gm_decision_id is not null/s);
+  assert.match(migration, /event_type = 'manual_adjustment'/s);
 });

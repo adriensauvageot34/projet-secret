@@ -64,6 +64,30 @@ type RawElementRuntimeRow = {
   }[] | null;
 };
 
+export function mapGmRuntimeElement(row: RawElementRuntimeRow): GmRuntimeElement {
+  const validationMode = row.element_templates?.[0]?.validation_mode ?? null;
+  const isPendingResolution = row.claimed_result !== null && row.final_result === null;
+
+  return {
+    id: row.id,
+    participant_id: row.participant_id,
+    participant_display_name: row.participants?.[0]?.display_name ?? null,
+    element_template_id: row.element_template_id,
+    template_name: row.element_templates?.[0]?.name ?? null,
+    element_type: row.element_templates?.[0]?.element_type ?? null,
+    validation_mode: validationMode,
+    state: row.state,
+    proof_status: row.proof_status,
+    is_fake: row.is_fake,
+    is_proof_pending: validationMode === "proof" && isPendingResolution && row.proof_status === "pending",
+    is_gm_pending: validationMode === "gm" && isPendingResolution && row.state === "active",
+    activated_at: row.activated_at,
+    ends_at: row.ends_at,
+    claimed_result: row.claimed_result,
+    final_result: row.final_result,
+  };
+}
+
 async function listParticipantsBySessionId(sessionId: string): Promise<GmRuntimeParticipant[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -105,28 +129,7 @@ async function listSessionLiveElements(sessionId: string): Promise<GmRuntimeElem
     throw new Error(`Failed to load session elements: ${error.message}`);
   }
 
-  return ((data ?? []) as RawElementRuntimeRow[]).map((row) => {
-    const validationMode = row.element_templates?.[0]?.validation_mode ?? null;
-
-    return {
-      id: row.id,
-      participant_id: row.participant_id,
-      participant_display_name: row.participants?.[0]?.display_name ?? null,
-      element_template_id: row.element_template_id,
-      template_name: row.element_templates?.[0]?.name ?? null,
-      element_type: row.element_templates?.[0]?.element_type ?? null,
-      validation_mode: validationMode,
-      state: row.state,
-      proof_status: row.proof_status,
-      is_fake: row.is_fake,
-      is_proof_pending: validationMode === "proof" && row.proof_status === "pending",
-      is_gm_pending: validationMode === "gm" && row.state === "active",
-      activated_at: row.activated_at,
-      ends_at: row.ends_at,
-      claimed_result: row.claimed_result,
-      final_result: row.final_result,
-    };
-  });
+  return ((data ?? []) as RawElementRuntimeRow[]).map(mapGmRuntimeElement);
 }
 
 export async function getGmRuntimeView(): Promise<GmRuntimeData> {
