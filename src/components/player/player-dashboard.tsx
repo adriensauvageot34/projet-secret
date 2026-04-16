@@ -60,6 +60,8 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
       <InventoryPanel
         inventory={runtime.runtime.inventory}
         targets={runtime.runtime.accusationTargets}
+        elementTargets={runtime.runtime.advantageElementTargets}
+        selfParticipantId={runtime.runtime.participant.id}
         pendingAdvantageActionId={runtime.pendingAdvantageActionId}
         onActivateAdvantage={runtime.activateAdvantage}
         onUseAdvantage={runtime.useAdvantage}

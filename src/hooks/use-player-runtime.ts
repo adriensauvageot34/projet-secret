@@ -50,6 +50,17 @@ export type PlayerAccusableTemplate = {
   elementType: "mission" | "constraint";
 };
 
+export type PlayerAdvantageElementTarget = {
+  id: string;
+  participantId: string;
+  participantDisplayName: string;
+  elementType: "mission" | "constraint";
+  state: "active" | "cooldown";
+  endsAt: string | null;
+  cooldownUntil: string | null;
+  label: string;
+};
+
 export type PlayerRuntimeData = {
   participant: Participant;
   level: {
@@ -69,6 +80,7 @@ export type PlayerRuntimeData = {
   };
   accusationTargets: PlayerAccusationTarget[];
   accusableTemplates: PlayerAccusableTemplate[];
+  advantageElementTargets: PlayerAdvantageElementTarget[];
 };
 
 function parseActionError(message: string): string {
@@ -102,6 +114,22 @@ function parseActionError(message: string): string {
 
   if (message.includes("Cannot consume advantage use: invalid_state")) {
     return "Impossible de consommer ce ticket dans son état actuel.";
+  }
+
+  if (message.includes("requires target_element_instance_id")) {
+    return "Veuillez sélectionner une cible valide avant d'utiliser cet avantage.";
+  }
+
+  if (message.includes("Target element must be in state active")) {
+    return "La cible doit être active.";
+  }
+
+  if (message.includes("Target element is not in cooldown") || message.includes("Target cooldown already ended")) {
+    return "La cible doit être un slot en cooldown encore actif.";
+  }
+
+  if (message.includes("Target element participant mismatch")) {
+    return "La cible ne correspond pas au participant sélectionné.";
   }
 
   if (message.includes("accuser_participant_id must be different")) {
@@ -291,6 +319,7 @@ export function usePlayerRuntime(participantId: string) {
   const activateAdvantage = useCallback(async (params: {
     advantageInstanceId: string;
     targetParticipantId?: string | null;
+    targetElementInstanceId?: string | null;
   }) => {
     try {
       setPendingAdvantageActionId(params.advantageInstanceId);
@@ -300,6 +329,7 @@ export function usePlayerRuntime(participantId: string) {
       await postJson("/api/advantages/activate", {
         advantageInstanceId: params.advantageInstanceId,
         targetParticipantId: params.targetParticipantId ?? null,
+        targetElementInstanceId: params.targetElementInstanceId ?? null,
       });
 
       setSuccessMessage("Ticket GM activé.");
@@ -311,7 +341,11 @@ export function usePlayerRuntime(participantId: string) {
     }
   }, [loadRuntime]);
 
-  const useAdvantage = useCallback(async (params: { advantageInstanceId: string }) => {
+  const useAdvantage = useCallback(async (params: {
+    advantageInstanceId: string;
+    targetElementInstanceId?: string | null;
+    targetParticipantId?: string | null;
+  }) => {
     try {
       setPendingAdvantageActionId(params.advantageInstanceId);
       setActionError(null);
@@ -319,6 +353,10 @@ export function usePlayerRuntime(participantId: string) {
 
       await postJson("/api/advantages/use", {
         advantageInstanceId: params.advantageInstanceId,
+        context: {
+          targetElementInstanceId: params.targetElementInstanceId ?? null,
+          targetParticipantId: params.targetParticipantId ?? null,
+        },
         gmNotes: "Ticket GM consommé depuis interface joueur",
       });
 
