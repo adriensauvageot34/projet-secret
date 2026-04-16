@@ -1,6 +1,1 @@
-export async function createGmDecision(input: Record<string, unknown>) {
-  // TODO: valider input
-  // TODO: charger données runtime
-  // TODO: appliquer règles + mutations
-  return { ok: true, input };
-}
+export { createGMDecision as createGmDecision } from "@/lib/game/services/gm-decisions";
