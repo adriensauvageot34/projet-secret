@@ -123,8 +123,20 @@ export function validateGMDecisionBusinessRules(input: {
     throw new Error("related_element_instance_id and target_element_instance_id must be different");
   }
 
+  if ((input.scoreImpact !== 0 || input.tokenImpact !== 0) && !input.targetParticipantId) {
+    throw new Error("target_participant_id is required when score_impact or token_impact is non-zero");
+  }
+
+  if (input.decisionType === "manual_bonus" && (input.scoreImpact < 0 || input.tokenImpact < 0)) {
+    throw new Error("manual_bonus cannot include negative score_impact or token_impact");
+  }
+
   if (input.decisionType === "manual_bonus" && input.scoreImpact <= 0 && input.tokenImpact <= 0) {
     throw new Error("manual_bonus requires a positive score_impact or token_impact");
+  }
+
+  if (input.decisionType === "manual_penalty" && (input.scoreImpact > 0 || input.tokenImpact > 0)) {
+    throw new Error("manual_penalty cannot include positive score_impact or token_impact");
   }
 
   if (input.decisionType === "manual_penalty" && input.scoreImpact >= 0 && input.tokenImpact >= 0) {
@@ -309,11 +321,17 @@ export async function applyGMDecision(input: ApplyGMDecisionInput): Promise<GMDe
     return decision;
   }
 
+  const plan = deriveLedgerEffectsPlan(decision);
   const appliedAt = payload.applyAt ?? new Date();
 
   if (payload.produceLedgerEvents) {
-    await applyScoreImpact(decision, appliedAt);
-    await applyTokenImpact(decision, appliedAt);
+    if (plan.shouldCreateScoreEvent) {
+      await applyScoreImpact(decision, appliedAt);
+    }
+
+    if (plan.shouldCreateTokenEvent) {
+      await applyTokenImpact(decision, appliedAt);
+    }
   }
 
   await updateGMDecisionRecord(decision.id, { status: "applied" });
@@ -333,6 +351,14 @@ export async function cancelGMDecision(input: CancelGMDecisionInput): Promise<GM
 
   if (!decision) {
     throw new Error("GM decision not found");
+  }
+
+  if (decision.status === "applied") {
+    throw new Error("An applied GM decision cannot be cancelled");
+  }
+
+  if (decision.status === "cancelled") {
+    return decision;
   }
 
   const nextNotes = payload.notes
@@ -394,4 +420,45 @@ export function resolveTargetParticipantForImpacts(decision: Pick<GMDecision, "t
 
 export function assertMadeByParticipantSession(participant: Participant, sessionId: string): void {
   assertSameSession(participant, sessionId, "made_by_participant");
+}
+
+type DecisionLedgerPlanInput = Pick<
+  GMDecisionDetail,
+  "id" | "score_impact" | "token_impact" | "target_participant_id" | "produced_score_events" | "produced_token_events"
+>;
+
+export function deriveLedgerEffectsPlan(input: DecisionLedgerPlanInput): {
+  shouldCreateScoreEvent: boolean;
+  shouldCreateTokenEvent: boolean;
+} {
+  const scoreImpact = input.score_impact ?? 0;
+  const tokenImpact = input.token_impact ?? 0;
+
+  if ((scoreImpact !== 0 || tokenImpact !== 0) && !input.target_participant_id) {
+    throw new Error("target_participant_id is required when score_impact or token_impact is non-zero");
+  }
+
+  const producedScoreEvents = input.produced_score_events.length;
+  const producedTokenEvents = input.produced_token_events.length;
+
+  if (scoreImpact === 0 && producedScoreEvents > 0) {
+    throw new Error("Decision has produced score events but score_impact is zero");
+  }
+
+  if (tokenImpact === 0 && producedTokenEvents > 0) {
+    throw new Error("Decision has produced token events but token_impact is zero");
+  }
+
+  if (producedScoreEvents > 1) {
+    throw new Error(`Decision ${input.id} produced duplicate score events`);
+  }
+
+  if (producedTokenEvents > 1) {
+    throw new Error(`Decision ${input.id} produced duplicate token events`);
+  }
+
+  return {
+    shouldCreateScoreEvent: scoreImpact !== 0 && producedScoreEvents === 0,
+    shouldCreateTokenEvent: tokenImpact !== 0 && producedTokenEvents === 0,
+  };
 }
