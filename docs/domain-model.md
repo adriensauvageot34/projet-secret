@@ -31,7 +31,7 @@ Current real catalog convention:
 - visible while locked (`visible_if_locked = true`)
 - active by default (`is_active = true`)
 
-The real catalog currently contains **36** advantage templates.
+The real catalog currently contains **36** advantage templates in definition, with **15** templates active for the Friday MVP shop catalog.
 
 ## Advantage runtime invariants (MVP)
 
