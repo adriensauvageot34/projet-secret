@@ -56,6 +56,7 @@ export interface Participant {
   id: string;
   session_id: string;
   player_id: string;
+  public_slug: string;
   current_level_id: string | null;
   display_name: string;
   role: ParticipantRole;

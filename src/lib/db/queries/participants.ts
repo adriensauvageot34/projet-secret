@@ -15,3 +15,18 @@ export async function getParticipantById(participantId: string): Promise<Partici
 
   return (data as Participant | null) ?? null;
 }
+
+export async function getParticipantByPublicSlug(publicSlug: string): Promise<Participant | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("public_slug", publicSlug)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as Participant | null) ?? null;
+}

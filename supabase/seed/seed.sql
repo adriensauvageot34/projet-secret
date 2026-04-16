@@ -6203,6 +6203,7 @@ players_for_session as (
 insert into participants (
   session_id,
   player_id,
+  public_slug,
   current_level_id,
   display_name,
   role,
@@ -6219,6 +6220,33 @@ insert into participants (
 select
   s.id,
   pfs.player_id,
+  case pfs.display_name
+    when 'Manon' then 'manon-x4k9'
+    when 'Mathilde' then 'mathilde-m7p2'
+    when 'Yannick' then 'yannick-y8t3'
+    when 'Esteban' then 'esteban-e6q4'
+    when 'Greg' then 'greg-g2v5'
+    when 'Alexis' then 'alexis-a9n6'
+    when 'Fanny' then 'fanny-f3r7'
+    when 'Chloé' then 'chloe-c5w8'
+    when 'Cédric' then 'cedric-c7m1'
+    when 'Juliette' then 'juliette-j4k2'
+    when 'Lou' then 'lou-l8p3'
+    when 'Mec de Lou' then 'mec-de-lou-m5s4'
+    when 'Lucas' then 'lucas-l2x5'
+    when 'Florentine' then 'florentine-f9d6'
+    when 'Marina' then 'marina-m3h7'
+    when 'Laurinne' then 'laurinne-l6q8'
+    when 'Andy' then 'andy-a1t9'
+    when 'Adrien' then 'adrien-z7g4'
+    else concat(
+      coalesce(
+        nullif(regexp_replace(lower(pfs.display_name), '[^a-z0-9]+', '-', 'g'), ''),
+        'player'
+      ),
+      '-x000'
+    )
+  end as public_slug,
   l1.id,
   pfs.display_name,
   pfs.role,
@@ -6238,6 +6266,7 @@ where pfs.include_in_session = true
 on conflict (session_id, player_id) do update
 set
   current_level_id = excluded.current_level_id,
+  public_slug = excluded.public_slug,
   display_name = excluded.display_name,
   role = excluded.role,
   current_status = excluded.current_status,

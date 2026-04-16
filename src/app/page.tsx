@@ -9,7 +9,7 @@ export default function HomePage() {
       <Card className="space-y-2">
         <h2 className="text-xl font-semibold">Entrées rapides</h2>
         <div className="flex flex-col gap-2">
-          <Link className="rounded bg-accent/20 px-3 py-2" href="/player/demo-participant">
+          <Link className="rounded bg-accent/20 px-3 py-2" href="/player/manon-x4k9">
             Interface joueur (demo)
           </Link>
           <Link className="rounded bg-accent/20 px-3 py-2" href="/gm">
