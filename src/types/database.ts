@@ -5,6 +5,7 @@ import type {
   AdvantageInstanceWithTemplate,
   AdvantageTargetType,
   AdvantageTemplate,
+  Participant,
 } from "@/types/domain";
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
@@ -67,3 +68,13 @@ export type AdvantagePurchaseInsert = Omit<
 };
 
 export type AdvantageInstanceWithTemplateRow = AdvantageInstanceWithTemplate;
+
+export interface ParticipantRow extends Participant {}
+
+export type ParticipantInsert = Omit<Participant, "id" | "created_at" | "updated_at"> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ParticipantUpdate = Partial<Omit<ParticipantInsert, "session_id" | "player_id">>;
