@@ -100,3 +100,14 @@ export async function getTemplatesForParticipant(level: number): Promise<Element
 export async function getTemplatesForParticipantRow(participant: { current_level: number }): Promise<ElementTemplate[]> {
   return getTemplatesForParticipant(participant.current_level);
 }
+
+export async function getElementTemplateById(templateId: string): Promise<ElementTemplate | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("element_templates").select("*").eq("id", templateId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as ElementTemplate | null) ?? null;
+}
