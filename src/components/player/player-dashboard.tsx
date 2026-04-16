@@ -57,7 +57,13 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
         pendingTemplateId={runtime.pendingShopTemplateId}
         onBuy={runtime.buyAdvantage}
       />
-      <InventoryPanel inventory={runtime.runtime.inventory} />
+      <InventoryPanel
+        inventory={runtime.runtime.inventory}
+        targets={runtime.runtime.accusationTargets}
+        pendingAdvantageActionId={runtime.pendingAdvantageActionId}
+        onActivateAdvantage={runtime.activateAdvantage}
+        onUseAdvantage={runtime.useAdvantage}
+      />
       <AccusationPanel
         accusationTargets={runtime.runtime.accusationTargets}
         accusableTemplates={runtime.runtime.accusableTemplates}
