@@ -8,6 +8,7 @@ import { createScoreEvent } from "@/lib/game/services/score-events";
 import { createGMDecisionRecord } from "@/lib/db/mutations/gm-decisions";
 import { getAccusationById, type AccusationDetail } from "@/lib/db/queries/accusations";
 import { hasAccusationCorrectRewardTokenEvent } from "@/lib/game/services/token-events";
+import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
 
 const suspectedTypeSchema = z.enum(["mission", "constraint"]);
 const accusationStatusSchema = z.enum(["submitted", "under_review", "validated", "rejected", "cancelled"]);
@@ -283,6 +284,7 @@ type AdjudicateAccusationDeps = {
   createScoreEventEntry: typeof createScoreEvent;
   createArbitrationDecision: typeof createArbitrationDecisionRecord;
   hasAccusationCorrectRewardTokenEventEntry: typeof hasAccusationCorrectRewardTokenEvent;
+  consumeFirstArmedAdvantageEntry: typeof consumeFirstArmedAdvantage;
 };
 
 const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
@@ -293,6 +295,7 @@ const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
   createScoreEventEntry: createScoreEvent,
   createArbitrationDecision: createArbitrationDecisionRecord,
   hasAccusationCorrectRewardTokenEventEntry: hasAccusationCorrectRewardTokenEvent,
+  consumeFirstArmedAdvantageEntry: consumeFirstArmedAdvantage,
 };
 
 export async function createAccusation(input: CreateAccusationInput, deps: CreateAccusationDeps = defaultCreateAccusationDeps): Promise<AccusationDetail> {
@@ -446,6 +449,26 @@ export async function adjudicateAccusation(
           throw error;
         }
       }
+    }
+  }
+
+  if (payload.decision === "correct") {
+    const consumedAccusationBonus = await deps.consumeFirstArmedAdvantageEntry({
+      participantId: accusation.accuser_participant_id,
+      effectCode: "next_correct_accusation_bonus_3",
+    });
+
+    if (consumedAccusationBonus) {
+      await deps.createTokenEventEntry({
+        participantId: accusation.accuser_participant_id,
+        sessionId: accusation.session_id,
+        eventType: "bonus_effect",
+        deltaTokens: 3,
+        relatedAccusationId: accusation.id,
+        relatedAdvantageInstanceId: consumedAccusationBonus.id,
+        notes: "Bonus accusation correcte (+3)",
+        createdAt: payload.adjudicatedAt,
+      });
     }
   }
 

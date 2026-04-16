@@ -21,13 +21,23 @@ export function isGmTicketParticipantTargetRequired(effectCode: string): boolean
   return PARTICIPANT_TARGET_REQUIRED_EFFECT_CODES.has(effectCode);
 }
 
-export function toPlayerAdvantageStateLabel(state: string, isGmTicket: boolean): string {
+const ARMED_BUFF_EFFECT_CODES = new Set([
+  "free_skip",
+  "next_correct_accusation_bonus_3",
+  "double_next_mission_value",
+]);
+
+export function toPlayerAdvantageStateLabel(state: string, isGmTicket: boolean, effectCode?: string): string {
   if (state === "owned") {
     return "disponible";
   }
 
   if (state === "active" && isGmTicket) {
     return "ticket actif";
+  }
+
+  if (state === "active" && effectCode && ARMED_BUFF_EFFECT_CODES.has(effectCode)) {
+    return "armé (en attente)";
   }
 
   if (state === "active") {

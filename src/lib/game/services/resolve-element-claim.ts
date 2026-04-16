@@ -3,6 +3,7 @@ import { recomputeParticipantSlots, updateCombo, updateParticipantLevel } from "
 import { listScoreEvents } from "@/lib/db/queries/score-events";
 import { getElementTemplateById } from "@/lib/db/queries/element-templates";
 import { createScoreEvent } from "@/lib/game/services/score-events";
+import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
 import type { ClaimedResult, FinalResult, ScoreEventType, ValidationMode } from "@/lib/game/enums";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
 
@@ -32,6 +33,7 @@ type ResolveElementClaimDependencies = {
   recomputeParticipantSlots: (participantId: string) => Promise<unknown>;
   updateCombo: (participantId: string, success: boolean) => Promise<number>;
   updateParticipantLevel: (participantId: string) => Promise<string | null>;
+  consumeFirstArmedAdvantage: typeof consumeFirstArmedAdvantage;
   now: () => Date;
 };
 
@@ -85,6 +87,7 @@ const defaultDependencies: ResolveElementClaimDependencies = {
   recomputeParticipantSlots,
   updateCombo,
   updateParticipantLevel,
+  consumeFirstArmedAdvantage,
   now: () => new Date(),
 };
 
@@ -184,7 +187,18 @@ async function applyFinalResolutionEffects(
   const existingScoreEventTypes = await dependencies.listResolutionScoreEvents(resolvedInstance.id);
   const scoreEventType = resolvedInstance.is_fake ? null : createScoreEventFromInstance(resolvedInstance, template);
 
-  if (scoreEventType && !existingScoreEventTypes.includes(scoreEventType)) {
+  let shouldCreateResolutionScoreEvent = Boolean(scoreEventType && !existingScoreEventTypes.includes(scoreEventType));
+
+  if (scoreEventType === "skip_penalty" && shouldCreateResolutionScoreEvent) {
+    const consumedFreeSkip = await dependencies.consumeFirstArmedAdvantage({
+      participantId: resolvedInstance.participant_id,
+      effectCode: "free_skip",
+    });
+
+    shouldCreateResolutionScoreEvent = !consumedFreeSkip;
+  }
+
+  if (scoreEventType && shouldCreateResolutionScoreEvent) {
     await createInstanceBoundScoreEvent(dependencies, {
       participantId: resolvedInstance.participant_id,
       sessionId: resolvedInstance.session_id,
@@ -192,6 +206,23 @@ async function applyFinalResolutionEffects(
       deltaPoints: computeResolutionDeltaPoints(template, scoreEventType),
       relatedElementInstanceId: resolvedInstance.id,
     });
+  }
+
+  if (scoreEventType === "mission_success") {
+    const consumedDoubleMission = await dependencies.consumeFirstArmedAdvantage({
+      participantId: resolvedInstance.participant_id,
+      effectCode: "double_next_mission_value",
+    });
+
+    if (consumedDoubleMission) {
+      await createInstanceBoundScoreEvent(dependencies, {
+        participantId: resolvedInstance.participant_id,
+        sessionId: resolvedInstance.session_id,
+        eventType: "manual_adjustment",
+        deltaPoints: Math.abs(template.base_points),
+        relatedElementInstanceId: resolvedInstance.id,
+      });
+    }
   }
 
   const comboCountsAsSuccess = resolvedInstance.final_result === "success" && !resolvedInstance.is_fake;

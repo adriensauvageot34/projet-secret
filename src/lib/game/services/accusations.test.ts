@@ -251,6 +251,7 @@ test("MVP flow: adjudication correct creates one accusation_correct token_event"
       createScoreEventEntry: async () => ({ id: "score" } as never),
       createArbitrationDecision: async () => undefined,
       hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
     },
   );
 
@@ -260,6 +261,49 @@ test("MVP flow: adjudication correct creates one accusation_correct token_event"
   assert.equal(result.is_receivable, true);
   assert.equal(result.reward_tokens, 2);
   assert.equal(tokenEventCalls, 1);
+});
+
+test("buff armé: next_correct_accusation_bonus_3 donne +3 jetons uniquement sur accusation correcte", async () => {
+  const tokenEvents: Array<{ eventType: string; deltaTokens: number }> = [];
+  let updated = false;
+  const finalDetail = makeAccusation({
+    status: "validated",
+    decision: "correct",
+    verdict: "juste",
+    is_receivable: true,
+    reward_tokens: 1,
+  });
+
+  await adjudicateAccusation(
+    {
+      accusationId: ACCUSATION_ID,
+      sessionId: SESSION_ID,
+      adjudicatedByParticipantId: GM_ID,
+      decision: "correct",
+      rewardTokens: 1,
+    },
+    {
+      getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation()),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+      updateAccusationRow: async () => {
+        updated = true;
+        return finalDetail;
+      },
+      createTokenEventEntry: async (input) => {
+        tokenEvents.push({ eventType: input.eventType, deltaTokens: input.deltaTokens });
+        return { id: "evt" } as never;
+      },
+      createScoreEventEntry: async () => ({ id: "score" } as never),
+      createArbitrationDecision: async () => undefined,
+      hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => ({ id: "adv-1" } as never),
+    },
+  );
+
+  assert.deepEqual(tokenEvents, [
+    { eventType: "accusation_correct", deltaTokens: 1 },
+    { eventType: "bonus_effect", deltaTokens: 3 },
+  ]);
 });
 
 test("guardrail: self-accusation is rejected", async () => {
@@ -425,6 +469,7 @@ test("adjudication not_receivable maps to rejected/irrecevable without reward to
       createScoreEventEntry: async () => ({ id: "score" } as never),
       createArbitrationDecision: async () => undefined,
       hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
     },
   );
 
@@ -451,6 +496,7 @@ test("guardrail: adjudication must be performed by a GM participant", async () =
         createScoreEventEntry: async () => ({ id: "score" } as never),
         createArbitrationDecision: async () => undefined,
         hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
       },
     ),
   );
@@ -480,6 +526,7 @@ test("guardrail: second adjudication with different decision is rejected", async
         createScoreEventEntry: async () => ({ id: "score" } as never),
         createArbitrationDecision: async () => undefined,
         hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
       },
     ),
   );
@@ -517,6 +564,7 @@ test("guardrail: no duplicate reward when correct adjudication is replayed after
       createScoreEventEntry: async () => ({ id: "score" } as never),
       createArbitrationDecision: async () => undefined,
       hasAccusationCorrectRewardTokenEventEntry: async () => true,
+      consumeFirstArmedAdvantageEntry: async () => null,
     },
   );
 
@@ -554,6 +602,7 @@ test("idempotence: duplicate token reward write does not break adjudication resu
       createScoreEventEntry: async () => ({ id: "score" } as never),
       createArbitrationDecision: async () => undefined,
       hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
     },
   );
 
@@ -599,6 +648,7 @@ test("fake bait: applique bonus MVP +5 score / +2 jetons pour l'accusé", async 
       },
       createArbitrationDecision: async () => undefined,
       hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
     },
   );
 
@@ -623,6 +673,7 @@ test("fake bait: rejeté si l'accusation n'est pas liée à un faux élément", 
         createScoreEventEntry: async () => ({ id: "score" } as never),
         createArbitrationDecision: async () => undefined,
         hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
       },
     ),
   );
