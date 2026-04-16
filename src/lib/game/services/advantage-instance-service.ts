@@ -256,9 +256,20 @@ export async function applyAdvantageUse(input: {
     throw new Error(`Cannot consume advantage use: ${consumeCheck.reasons.join(", ")}`);
   }
 
+  const contextTargetElementId =
+    typeof input.context?.targetElementInstanceId === "string" ? input.context.targetElementInstanceId : null;
+  const contextTargetParticipantId =
+    typeof input.context?.targetParticipantId === "string" ? input.context.targetParticipantId : null;
+
+  const effectInstance = {
+    ...instance,
+    target_element_instance_id: contextTargetElementId ?? instance.target_element_instance_id,
+    target_participant_id: contextTargetParticipantId ?? instance.target_participant_id,
+  };
+
   const handler = getAdvantageEffectHandler(instance.template.effect_code);
   await handler({
-    instance,
+    instance: effectInstance,
     template: instance.template,
     context: input.context ?? {},
   });

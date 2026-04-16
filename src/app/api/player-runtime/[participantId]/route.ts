@@ -44,6 +44,50 @@ async function listAccusationTargets(sessionId: string, selfParticipantId: strin
   }));
 }
 
+async function listAdvantageElementTargets(sessionId: string, selfParticipantId: string) {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("element_instances")
+    .select(`
+      id,
+      participant_id,
+      state,
+      ends_at,
+      cooldown_until,
+      participants!inner(display_name),
+      element_templates!inner(element_type)
+    `)
+    .eq("session_id", sessionId)
+    .or("state.eq.active,state.eq.cooldown")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load advantage element targets: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => {
+    const elementTypeRelation = Array.isArray(row.element_templates) ? row.element_templates[0] : row.element_templates;
+    const participantRelation = Array.isArray(row.participants) ? row.participants[0] : row.participants;
+    const elementType = (elementTypeRelation?.element_type as "mission" | "constraint") ?? "mission";
+    const participantDisplayName = (participantRelation?.display_name as string) ?? "Participant";
+    const state = row.state as "active" | "cooldown";
+    const isSelf = row.participant_id === selfParticipantId;
+
+    return {
+      id: row.id as string,
+      participantId: row.participant_id as string,
+      participantDisplayName,
+      elementType,
+      state,
+      endsAt: (row.ends_at as string | null) ?? null,
+      cooldownUntil: (row.cooldown_until as string | null) ?? null,
+      label: isSelf
+        ? `${elementType === "mission" ? "Ta mission" : "Ta contrainte"} (${state === "active" ? "active" : "cooldown"})`
+        : `${elementType === "mission" ? "Mission" : "Contrainte"} de ${participantDisplayName} (${state === "active" ? "active" : "cooldown"})`,
+    };
+  });
+}
+
 export async function GET(_request: Request, context: { params: { participantId: string } }) {
   try {
     const participant = await getParticipantById(context.params.participantId);
@@ -60,7 +104,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
@@ -68,6 +112,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       listSessionRankingParticipants(participant.session_id),
       listAccusationTargets(participant.session_id, participant.id),
       getActiveTemplates(),
+      listAdvantageElementTargets(participant.session_id, participant.id),
     ]);
 
     const templatesById = new Map(templatesForLevel.map((template) => [template.id, template]));
@@ -152,6 +197,7 @@ export async function GET(_request: Request, context: { params: { participantId:
         },
         accusationTargets,
         accusableTemplates,
+        advantageElementTargets,
       },
     });
   } catch (error) {
