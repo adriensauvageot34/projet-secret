@@ -1,4 +1,5 @@
 import { getAdvantageTemplateById } from "@/lib/db/queries/advantage-templates";
+import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
 import {
   getActiveTimedAdvantagesExpiringBefore,
   getAdvantageInstanceWithTemplateById,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/db/mutations/advantage-instances";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAdvantageEffectHandler } from "@/lib/game/engine/advantage-effect-registry";
-import { createTokenEvent } from "@/lib/game/services/token-events";
 import {
   canActivateAdvantageInstance,
   canConsumeAdvantageUse,
@@ -24,6 +24,84 @@ import {
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { validateAdvantageTargeting } from "@/lib/game/rules/advantage-targeting";
 import type { AdvantageInstance, AdvantageTemplate } from "@/types/domain";
+import type { Level, Participant } from "@/types/domain";
+
+type PurchaseContext = {
+  participant: Participant;
+  template: AdvantageTemplate;
+  level: Level;
+  levelNumber: number;
+};
+
+export type PurchaseAdvantageDeps = {
+  loadParticipant: (participantId: string) => Promise<Participant | null>;
+  loadTemplate: (templateId: string) => Promise<AdvantageTemplate | null>;
+  loadLevelById: (levelId: string) => Promise<Level | null>;
+  loadDefaultLevel: () => Promise<Level | null>;
+  runAtomicPurchase: (input: {
+    participantId: string;
+    templateId: string;
+    gmNotes?: string;
+  }) => Promise<AdvantageInstance>;
+};
+
+function createPurchaseDeps(): PurchaseAdvantageDeps {
+  return {
+    loadParticipant: getParticipantById,
+    loadTemplate: getAdvantageTemplateById,
+    loadLevelById: getLevelById,
+    loadDefaultLevel: () => getLevelByNumber(1),
+    runAtomicPurchase: async (input) => {
+      const supabase = createServerSupabaseClient();
+      const { data, error } = await supabase.rpc("purchase_advantage_shop", {
+        p_participant_id: input.participantId,
+        p_template_id: input.templateId,
+        p_gm_notes: input.gmNotes ?? null,
+      });
+
+      if (error || !data) {
+        throw new Error(`Failed to purchase advantage: ${error?.message ?? "unknown error"}`);
+      }
+
+      return data as AdvantageInstance;
+    },
+  };
+}
+
+async function buildPurchaseContext(
+  input: {
+    templateId: string;
+    participantId: string;
+  },
+  deps: PurchaseAdvantageDeps,
+): Promise<PurchaseContext> {
+  const participant = await deps.loadParticipant(input.participantId);
+
+  if (!participant) {
+    throw new Error("Participant not found");
+  }
+
+  const template = await deps.loadTemplate(input.templateId);
+
+  if (!template) {
+    throw new Error("Advantage template not found");
+  }
+
+  const level = participant.current_level_id
+    ? await deps.loadLevelById(participant.current_level_id)
+    : await deps.loadDefaultLevel();
+
+  if (!level) {
+    throw new Error("Participant level not found");
+  }
+
+  return {
+    participant,
+    template,
+    level,
+    levelNumber: level.level_number,
+  };
+}
 
 export async function grantAdvantageToParticipant(input: {
   templateId: string;
@@ -61,62 +139,20 @@ export async function purchaseAdvantageForParticipant(input: {
   templateId: string;
   participantId: string;
   gmNotes?: string;
-}): Promise<AdvantageInstance> {
-  const participant = await getParticipantById(input.participantId);
-
-  if (!participant) {
-    throw new Error("Participant not found");
-  }
-
-  const template = await getAdvantageTemplateById(input.templateId);
-
-  if (!template) {
-    throw new Error("Advantage template not found");
-  }
-
-  const levelNumber = Number(participant.current_level_id ? 999 : 1);
-  const purchaseCheck = canParticipantBuyAdvantage(template, levelNumber, participant.current_tokens);
+}, deps: PurchaseAdvantageDeps = createPurchaseDeps()): Promise<AdvantageInstance> {
+  const context = await buildPurchaseContext(input, deps);
+  const purchaseCheck = canParticipantBuyAdvantage(
+    context.template,
+    context.levelNumber,
+    context.participant.current_tokens,
+    context.level.shop_tier_max,
+  );
 
   if (!purchaseCheck.ok) {
     throw new Error(`Cannot purchase advantage: ${purchaseCheck.reasons.join(", ")}`);
   }
 
-  const supabase = createServerSupabaseClient();
-
-  const { data: instanceData, error: instanceError } = await supabase
-    .from("advantage_instances")
-    .insert({
-      source: "shop",
-      cost_paid: template.cost_tokens,
-      state: "owned",
-      activated_at: null,
-      expires_at: null,
-      remaining_uses: template.max_uses,
-      gm_notes: input.gmNotes ?? "",
-      advantage_template_id: template.id,
-      session_id: participant.session_id,
-      assigned_player_id: participant.player_id,
-      participant_id: participant.id,
-      target_participant_id: null,
-      target_element_instance_id: null,
-    })
-    .select("*")
-    .single();
-
-  if (instanceError || !instanceData) {
-    throw new Error(`Failed to create purchased advantage: ${instanceError?.message ?? "unknown error"}`);
-  }
-
-  await createTokenEvent({
-    participantId: participant.id,
-    sessionId: participant.session_id,
-    eventType: "shop_purchase",
-    deltaTokens: -template.cost_tokens,
-    notes: input.gmNotes ?? null,
-    relatedAdvantageInstanceId: instanceData.id,
-  });
-
-  return instanceData as AdvantageInstance;
+  return deps.runAtomicPurchase(input);
 }
 
 export async function activateParticipantAdvantage(input: {

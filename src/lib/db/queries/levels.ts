@@ -16,6 +16,21 @@ export async function getLevelByNumber(levelNumber: number): Promise<Level | nul
   return (data as Level | null) ?? null;
 }
 
+export async function getLevelById(levelId: string): Promise<Level | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("levels")
+    .select("*")
+    .eq("id", levelId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as Level | null) ?? null;
+}
+
 export async function getAllLevels(): Promise<Level[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase

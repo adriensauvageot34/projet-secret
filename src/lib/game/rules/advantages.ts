@@ -50,14 +50,19 @@ export function canParticipantSeeAdvantage(
 }
 
 export function canParticipantBuyAdvantage(
-  template: Pick<AdvantageTemplate, "is_active" | "min_player_level" | "cost_tokens">,
+  template: Pick<AdvantageTemplate, "is_active" | "tier" | "min_player_level" | "cost_tokens">,
   levelNumber: number,
   availableTokens: number,
+  shopTierMax?: number,
 ): { ok: boolean; reasons: string[] } {
   const reasons: string[] = [];
 
   if (!template.is_active) {
     reasons.push("template_inactive");
+  }
+
+  if (shopTierMax !== undefined && template.tier > shopTierMax) {
+    reasons.push("template_not_purchasable");
   }
 
   if (levelNumber < template.min_player_level) {
