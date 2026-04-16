@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiResponse } from "@/types/api";
 import type {
+  Accusation,
   AdvantageInstanceWithTemplate,
   AdvantageTemplate,
   ElementInstance,
@@ -38,6 +39,17 @@ export type PlayerShopItem = {
   reasons: string[];
 };
 
+export type PlayerAccusationTarget = {
+  id: string;
+  displayName: string;
+};
+
+export type PlayerAccusableTemplate = {
+  id: string;
+  name: string;
+  elementType: "mission" | "constraint";
+};
+
 export type PlayerRuntimeData = {
   participant: Participant;
   level: {
@@ -55,6 +67,8 @@ export type PlayerRuntimeData = {
     above: LiveRankingEntry | null;
     below: LiveRankingEntry | null;
   };
+  accusationTargets: PlayerAccusationTarget[];
+  accusableTemplates: PlayerAccusableTemplate[];
 };
 
 function parseActionError(message: string): string {
@@ -76,6 +90,14 @@ function parseActionError(message: string): string {
 
   if (message.includes("template_not_purchasable")) {
     return "Ce template n'est pas achetable à votre niveau/tier actuel.";
+  }
+
+  if (message.includes("accuser_participant_id must be different")) {
+    return "Vous ne pouvez pas vous auto-accuser.";
+  }
+
+  if (message.includes("must target an element_templates row")) {
+    return "Le template choisi ne correspond pas au type d'accusation.";
   }
 
   return message;
@@ -107,6 +129,7 @@ export function usePlayerRuntime(participantId: string) {
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [pendingInstanceId, setPendingInstanceId] = useState<string | null>(null);
   const [pendingShopTemplateId, setPendingShopTemplateId] = useState<string | null>(null);
+  const [isCreatingAccusation, setIsCreatingAccusation] = useState(false);
   const [lastClaimFlowByInstanceId, setLastClaimFlowByInstanceId] = useState<Record<string, string>>({});
 
   const loadRuntime = useCallback(async (initial = false) => {
@@ -211,6 +234,39 @@ export function usePlayerRuntime(participantId: string) {
     }
   }, [loadRuntime, participantId]);
 
+  const createAccusation = useCallback(async (params: {
+    accusedParticipantId: string;
+    suspectedType: "mission" | "constraint";
+    suspectedTemplateId: string;
+    justification: string;
+  }): Promise<Accusation> => {
+    try {
+      setIsCreatingAccusation(true);
+      setActionError(null);
+      setSuccessMessage(null);
+
+      const accusation = await postJson<Accusation>("/api/accusations/create", {
+        sessionId: runtime?.participant.session_id ?? "",
+        accuserParticipantId: participantId,
+        accusedParticipantId: params.accusedParticipantId,
+        suspectedType: params.suspectedType,
+        suspectedTemplateId: params.suspectedTemplateId,
+        justification: params.justification,
+      });
+
+      setSuccessMessage("Accusation envoyée au GM.");
+      await loadRuntime(false);
+
+      return accusation;
+    } catch (cause) {
+      const readableError = cause instanceof Error ? cause.message : "Accusation impossible";
+      setActionError(readableError);
+      throw new Error(readableError);
+    } finally {
+      setIsCreatingAccusation(false);
+    }
+  }, [loadRuntime, participantId, runtime?.participant.session_id]);
+
   return useMemo(() => ({
     runtime,
     isLoading,
@@ -221,17 +277,21 @@ export function usePlayerRuntime(participantId: string) {
     pendingTemplateId,
     pendingInstanceId,
     pendingShopTemplateId,
+    isCreatingAccusation,
     lastClaimFlowByInstanceId,
     refresh: () => loadRuntime(false),
     activateElement,
     claimResult,
     buyAdvantage,
+    createAccusation,
   }), [
     activateElement,
     actionError,
     buyAdvantage,
     claimResult,
+    createAccusation,
     error,
+    isCreatingAccusation,
     isLoading,
     isRefreshing,
     lastClaimFlowByInstanceId,

@@ -58,7 +58,14 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
         onBuy={runtime.buyAdvantage}
       />
       <InventoryPanel inventory={runtime.runtime.inventory} />
-      <AccusationPanel />
+      <AccusationPanel
+        accusationTargets={runtime.runtime.accusationTargets}
+        accusableTemplates={runtime.runtime.accusableTemplates}
+        isPending={runtime.isCreatingAccusation}
+        actionError={runtime.actionError}
+        successMessage={runtime.successMessage}
+        onCreateAccusation={runtime.createAccusation}
+      />
     </>
   );
 }

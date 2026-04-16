@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
 import { listElementInstancesByParticipant } from "@/lib/db/queries/element-instances";
-import { getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
+import { getActiveTemplates, getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
@@ -24,6 +24,26 @@ async function listSessionRankingParticipants(sessionId: string): Promise<Rankin
   return (data ?? []) as RankingParticipant[];
 }
 
+async function listAccusationTargets(sessionId: string, selfParticipantId: string) {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participants")
+    .select("id, display_name, role")
+    .eq("session_id", sessionId)
+    .neq("id", selfParticipantId)
+    .neq("role", "gm")
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load accusation targets: ${error.message}`);
+  }
+
+  return (data ?? []).map((participant) => ({
+    id: participant.id as string,
+    displayName: participant.display_name as string,
+  }));
+}
+
 export async function GET(_request: Request, context: { params: { participantId: string } }) {
   try {
     const participant = await getParticipantById(context.params.participantId);
@@ -40,12 +60,14 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
       getVisibleShopTemplatesForLevel(level.level_number),
       listSessionRankingParticipants(participant.session_id),
+      listAccusationTargets(participant.session_id, participant.id),
+      getActiveTemplates(),
     ]);
 
     const templatesById = new Map(templatesForLevel.map((template) => [template.id, template]));
@@ -101,6 +123,14 @@ export async function GET(_request: Request, context: { params: { participantId:
       throw new Error("Participant missing from session ranking");
     }
 
+    const accusableTemplates = activeTemplates
+      .filter((template) => template.element_type === "mission" || template.element_type === "constraint")
+      .map((template) => ({
+        id: template.id,
+        name: template.name,
+        elementType: template.element_type,
+      }));
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -120,6 +150,8 @@ export async function GET(_request: Request, context: { params: { participantId:
           above: localRanking.above,
           below: localRanking.below,
         },
+        accusationTargets,
+        accusableTemplates,
       },
     });
   } catch (error) {
