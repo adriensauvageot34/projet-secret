@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ScoreEvent, ScoreEventDetail } from "@/types/domain";
 import type { ScoreEventType } from "@/lib/game/enums";
 import { enrichScoreEventRow, getScoreEventById } from "@/lib/db/queries/score-events";
+import { updateParticipantLevel } from "@/lib/db/mutations/participants";
 
 export const createScoreEventSchema = z.object({
   participantId: z.string().uuid(),
@@ -195,6 +196,8 @@ export async function createScoreEvent(input: CreateScoreEventInput): Promise<Sc
   if (participantUpdateError) {
     throw new Error(`Failed to update participant.current_score: ${participantUpdateError.message}`);
   }
+
+  await updateParticipantLevel(payload.participantId);
 
   const enriched = await getScoreEventById((data as ScoreEvent).id);
 
