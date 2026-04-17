@@ -2,6 +2,7 @@ import { createElementInstance, getEndsAt, getSkipAvailableAt } from "@/lib/db/m
 import { getVisibleReserveOfferByIdForParticipantSession } from "@/lib/db/queries/participant-reserve-offers";
 import { revokeReserveOffer } from "@/lib/db/mutations/participant-reserve-offers";
 import { getSkipUnlockTime, getEndTime, isEligibleForReserve } from "@/lib/game/engine/template-engine";
+import { refillVisibleReserveOfferForResolvedElement } from "@/lib/game/services/participant-reserve-offers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assertSessionAllowsGameplay } from "@/lib/game/rules/session";
 import type { ElementInstance, ElementTemplate, Level, Participant, Session } from "@/types/domain";
@@ -57,6 +58,12 @@ type ActivateElementDeps = {
     isFake: boolean;
   }) => Promise<ElementInstance>;
   consumeOffer: (offerId: string, revokedAt: string) => Promise<void>;
+  refillOfferAfterActivation?: (input: { participantId: string; sessionId: string; consumedTemplateId: string }) => Promise<{
+    replaced: boolean;
+    replacementOfferId: string | null;
+    reason: string;
+    debugMessage: string;
+  }>;
   now: () => Date;
 };
 
@@ -280,6 +287,12 @@ function createDefaultDeps(): ActivateElementDeps {
     consumeOffer: async (offerId, revokedAt) => {
       await revokeReserveOffer(offerId, { revokedAt });
     },
+    refillOfferAfterActivation: async (input) =>
+      refillVisibleReserveOfferForResolvedElement({
+        participantId: input.participantId,
+        sessionId: input.sessionId,
+        consumedTemplateId: input.consumedTemplateId,
+      }),
     now: () => new Date(),
   };
 }
@@ -365,6 +378,23 @@ export async function activateElement(
   });
 
   await deps.consumeOffer(visibleOffer.id, plan.activatedAt);
+  if (deps.refillOfferAfterActivation) {
+    const refillResult = await deps.refillOfferAfterActivation({
+      participantId: participant.id,
+      sessionId: session.id,
+      consumedTemplateId: template.id,
+    });
+
+    if (!refillResult.replaced) {
+      console.warn("[reserve-refill] activation replacement skipped", {
+        participantId: participant.id,
+        sessionId: session.id,
+        consumedTemplateId: template.id,
+        reason: refillResult.reason,
+        debugMessage: refillResult.debugMessage,
+      });
+    }
+  }
 
   return {
     instance,
