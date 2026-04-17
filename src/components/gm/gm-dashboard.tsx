@@ -57,6 +57,7 @@ export function GmDashboard() {
           <GmAccusationsQueue
             accusations={gm.runtime.accusations}
             participantOptions={participantOptions}
+            liveElements={gm.runtime.liveElements}
             pendingActionKey={gm.pendingActionKey}
             onCreate={gm.createAccusation}
             onAdjudicate={gm.adjudicateAccusation}

@@ -6,7 +6,6 @@ import { ActiveElementsPanel } from "@/components/player/active-elements-panel";
 import { ReservePanel } from "@/components/player/reserve-panel";
 import { ShopPanel } from "@/components/player/shop-panel";
 import { InventoryPanel } from "@/components/player/inventory-panel";
-import { AccusationPanel } from "@/components/player/accusation-panel";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePlayerRuntime } from "@/hooks/use-player-runtime";
@@ -40,6 +39,11 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
         successMessage={runtime.successMessage}
         actionError={runtime.actionError}
       />
+      {runtime.runtime.caughtNotification ? (
+        <Card className="border-amber-500/50 bg-amber-950/30 text-sm font-medium text-amber-100">
+          {runtime.runtime.caughtNotification.message}
+        </Card>
+      ) : null}
       <PlayerRankStrip level={runtime.runtime.level} ranking={runtime.runtime.ranking} />
       {runtime.runtime.sessionStatus === "finished" ? (
         <Card className="text-sm text-slate-200">
@@ -65,20 +69,12 @@ export function PlayerDashboard({ participantId }: { participantId: string }) {
           />
           <InventoryPanel
             inventory={runtime.runtime.inventory}
-            targets={runtime.runtime.accusationTargets}
+            targets={runtime.runtime.participantTargets}
             elementTargets={runtime.runtime.advantageElementTargets}
             selfParticipantId={runtime.runtime.participant.id}
             pendingAdvantageActionId={runtime.pendingAdvantageActionId}
             onActivateAdvantage={runtime.activateAdvantage}
             onUseAdvantage={runtime.useAdvantage}
-          />
-          <AccusationPanel
-            accusationTargets={runtime.runtime.accusationTargets}
-            accusableTemplates={runtime.runtime.accusableTemplates}
-            isPending={runtime.isCreatingAccusation}
-            actionError={runtime.actionError}
-            successMessage={runtime.successMessage}
-            onCreateAccusation={runtime.createAccusation}
           />
         </>
       )}
