@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
-import {
-  listElementInstancesByParticipant,
-} from "@/lib/db/queries/element-instances";
-import { getActiveTemplates, getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
+import { listActiveElementInstancesByParticipant } from "@/lib/db/queries/element-instances";
+import { getActiveTemplates, getTemplatesForParticipant, listElementTemplatesByIds } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
@@ -13,6 +11,7 @@ import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } fr
 import { getSessionById } from "@/lib/db/queries/sessions";
 import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
 import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
+import { mapPlayerActiveElements } from "@/lib/game/mappers/participant-runtime";
 
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
@@ -109,8 +108,8 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
-      listElementInstancesByParticipant(participant.id),
+    const [activeInstances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
+      listActiveElementInstancesByParticipant(participant.id, participant.session_id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
       getVisibleShopTemplatesForLevel(level.level_number),
@@ -126,26 +125,10 @@ export async function GET(_request: Request, context: { params: { participantId:
       throw new Error("Session not found");
     }
 
-    const templatesById = new Map(templatesForLevel.map((template) => [template.id, template]));
-
-    const activeElements = instances
-      .filter((instance) => instance.state === "active")
-      .map((instance) => {
-        const template = templatesById.get(instance.element_template_id) ?? null;
-
-        return {
-          instance,
-          template: template
-            ? {
-                id: template.id,
-                name: template.name,
-                code: template.code,
-                elementType: template.element_type,
-                validationMode: template.validation_mode,
-              }
-            : null,
-        };
-      });
+    const activeTemplateIds = Array.from(new Set(activeInstances.map((instance) => instance.element_template_id)));
+    const activeElementTemplates = await listElementTemplatesByIds(activeTemplateIds);
+    const activeTemplatesById = new Map(activeElementTemplates.map((template) => [template.id, template]));
+    const activeElements = mapPlayerActiveElements(activeInstances, activeTemplatesById);
 
     if (persistedVisibleReserveOffers.length === 0 && session.status === "live") {
       await bootstrapInitialSessionReserves(session.id);

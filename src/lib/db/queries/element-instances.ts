@@ -27,6 +27,28 @@ export async function listElementInstancesByParticipant(participantId: string): 
   return (data as ElementInstance[] | null) ?? [];
 }
 
+
+export async function listActiveElementInstancesByParticipant(
+  participantId: string,
+  sessionId: string,
+): Promise<ElementInstance[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("element_instances")
+    .select("*")
+    .eq("participant_id", participantId)
+    .eq("session_id", sessionId)
+    .eq("state", "active")
+    .order("activated_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list active participant element instances: ${error.message}`);
+  }
+
+  return (data as ElementInstance[] | null) ?? [];
+}
+
 export async function listElementInstancesBySession(sessionId: string): Promise<ElementInstance[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
