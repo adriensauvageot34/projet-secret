@@ -11,6 +11,7 @@ import { buildVisibleReserveTemplates } from "@/lib/game/services/reserve-templa
 import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
 import { getSessionById } from "@/lib/db/queries/sessions";
 import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
+import { listGloballyUnavailableTemplateIdsForSession } from "@/lib/game/services/template-global-availability";
 
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
@@ -107,7 +108,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers, globallyUnavailableTemplateIds] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
@@ -117,6 +118,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       getActiveTemplates(),
       listAdvantageElementTargets(participant.session_id, participant.id),
       listVisibleReserveForParticipant(participant.id),
+      listGloballyUnavailableTemplateIdsForSession(participant.session_id, { requesterParticipantId: participant.id }),
     ]);
 
     const session = await getSessionById(participant.session_id);
@@ -145,7 +147,10 @@ export async function GET(_request: Request, context: { params: { participantId:
         };
       });
 
-    const computedReserveTemplates = buildVisibleReserveTemplates(templatesForLevel, level).map((template) => ({
+    const computedReserveTemplates = buildVisibleReserveTemplates(
+      templatesForLevel.filter((template) => !globallyUnavailableTemplateIds.has(template.id)),
+      level,
+    ).map((template) => ({
       id: template.id,
       name: template.name,
       code: template.code,
