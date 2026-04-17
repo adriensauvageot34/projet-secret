@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createVisibleReserveOffer,
+  refillVisibleReserveOfferForResolvedElement,
   replaceVisibleReserveOfferWithDependencies,
 } from "@/lib/game/services/participant-reserve-offers";
 import type { ElementTemplate, Participant, ParticipantReserveOffer } from "@/types/domain";
@@ -97,6 +98,7 @@ test("reserve offer replacement: template encore bloquant chez A n'est pas propo
       { offerId: "offer-b", replacementTemplateId: "template-1" },
       {
         getVisibleReserveOfferById: async () => makeOffer({ id: "offer-b", participant_id: "participant-b" }),
+        getReserveOfferById: async () => makeOffer({ id: "offer-b", participant_id: "participant-b" }),
         getParticipantById: async () => makeParticipant({ id: "participant-b", display_name: "B" }),
         getElementTemplateById: async () => makeTemplate({ id: "template-1" }),
         listVisibleReserveOffersBySession: async () => [],
@@ -209,4 +211,67 @@ test("reserve offer creation: skipped chez A => template peut revenir chez A", a
   );
 
   assert.equal(created.id, "offer-skipped");
+});
+
+test("reserve refill: succès => remplacement immédiat via offre consommée", async () => {
+  const result = await refillVisibleReserveOfferForResolvedElement(
+    {
+      participantId: "participant-a",
+      sessionId: "session-1",
+      consumedTemplateId: "template-consumed",
+    },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-a" }),
+      getElementTemplateById: async (templateId: string) => makeTemplate({ id: templateId }),
+      getReserveOfferById: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLatestRevokedReserveOfferForTemplate: async () => makeOffer({ id: "offer-consumed", element_template_id: "template-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getTemplatesForParticipant: async () => [
+        makeTemplate({ id: "template-consumed" }),
+        makeTemplate({ id: "template-replacement", code: "TMP-2" }),
+      ],
+      listVisibleReserveOffersByParticipant: async () => [],
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async (payload) => makeOffer({ id: "offer-new", participant_id: payload.participant_id, element_template_id: payload.element_template_id }),
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z", replaced_by_offer_id: "offer-new" }),
+      attachReplacementToReserveOffer: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z", replaced_by_offer_id: "offer-new" }),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
+    },
+  );
+
+  assert.equal(result.replaced, true);
+  assert.equal(result.replacementOfferId, "offer-new");
+});
+
+test("reserve refill: aucun candidat => pas de crash", async () => {
+  const result = await refillVisibleReserveOfferForResolvedElement(
+    {
+      participantId: "participant-a",
+      sessionId: "session-1",
+      consumedTemplateId: "template-consumed",
+    },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-a" }),
+      getElementTemplateById: async (templateId: string) => makeTemplate({ id: templateId }),
+      getReserveOfferById: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLatestRevokedReserveOfferForTemplate: async () => makeOffer({ id: "offer-consumed", element_template_id: "template-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getTemplatesForParticipant: async () => [makeTemplate({ id: "template-consumed" })],
+      listVisibleReserveOffersByParticipant: async () => [],
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async () => makeOffer(),
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer(),
+      attachReplacementToReserveOffer: async () => makeOffer(),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
+    },
+  );
+
+  assert.equal(result.replaced, false);
+  assert.equal(result.replacementOfferId, null);
 });

@@ -5,6 +5,7 @@ import { getElementInstanceById } from "@/lib/db/queries/element-instances";
 import { getElementTemplateById } from "@/lib/db/queries/element-templates";
 import { createScoreEvent } from "@/lib/game/services/score-events";
 import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
+import { refillVisibleReserveOfferForResolvedElement } from "@/lib/game/services/participant-reserve-offers";
 import { assertSessionIsLiveById } from "@/lib/game/rules/session";
 import type { ClaimedResult, FinalResult, ScoreEventType, ValidationMode } from "@/lib/game/enums";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
@@ -37,6 +38,7 @@ type ResolveElementClaimDependencies = {
   updateCombo: (participantId: string, success: boolean) => Promise<number>;
   updateParticipantLevel: (participantId: string) => Promise<string | null>;
   consumeFirstArmedAdvantage: typeof consumeFirstArmedAdvantage;
+  refillVisibleReserveOfferForResolvedElement?: typeof refillVisibleReserveOfferForResolvedElement;
   now: () => Date;
 };
 
@@ -92,6 +94,7 @@ const defaultDependencies: ResolveElementClaimDependencies = {
   updateCombo,
   updateParticipantLevel,
   consumeFirstArmedAdvantage,
+  refillVisibleReserveOfferForResolvedElement,
   now: () => new Date(),
 };
 
@@ -269,6 +272,14 @@ async function applyFinalResolutionEffects(
 
   await dependencies.recomputeParticipantSlots(resolvedInstance.participant_id);
   await dependencies.updateParticipantLevel(resolvedInstance.participant_id);
+
+  if (dependencies.refillVisibleReserveOfferForResolvedElement) {
+    await dependencies.refillVisibleReserveOfferForResolvedElement({
+      participantId: resolvedInstance.participant_id,
+      sessionId: resolvedInstance.session_id,
+      consumedTemplateId: resolvedInstance.element_template_id,
+    });
+  }
 }
 
 export async function resolveElementClaim(

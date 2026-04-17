@@ -1,5 +1,7 @@
-import { createReserveOffer, revokeReserveOffer } from "@/lib/db/mutations/participant-reserve-offers";
+import { attachReplacementToReserveOffer, createReserveOffer, revokeReserveOffer } from "@/lib/db/mutations/participant-reserve-offers";
 import {
+  getLatestRevokedReserveOfferForTemplate,
+  getReserveOfferById,
   getVisibleReserveOfferById,
   listVisibleReserveOffersByParticipant,
   listVisibleReserveOffersBySession,
@@ -9,6 +11,8 @@ import { getElementTemplateById } from "@/lib/db/queries/element-templates";
 import { listSuccessfulElementTemplateIdsForParticipantInSession } from "@/lib/db/queries/element-instances";
 import { assertVisibleReserveOfferUniqueness } from "@/lib/game/rules/reserve";
 import { isTemplateGloballyUnavailableInSession } from "@/lib/game/services/template-global-availability";
+import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
+import { getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
 import type { ParticipantReserveOffer, ParticipantReserveOfferWithTemplate } from "@/types/domain";
 
 type CreateVisibleReserveOfferInput = {
@@ -26,10 +30,17 @@ type ReplaceVisibleReserveOfferInput = {
 type ParticipantReserveOfferDependencies = {
   getParticipantById: typeof getParticipantById;
   getElementTemplateById: typeof getElementTemplateById;
+  getReserveOfferById: typeof getReserveOfferById;
+  getLatestRevokedReserveOfferForTemplate: typeof getLatestRevokedReserveOfferForTemplate;
+  getLevelById: typeof getLevelById;
+  getLevelByNumber: typeof getLevelByNumber;
+  getTemplatesForParticipant: typeof getTemplatesForParticipant;
+  listVisibleReserveOffersByParticipant: typeof listVisibleReserveOffersByParticipant;
   listVisibleReserveOffersBySession: typeof listVisibleReserveOffersBySession;
   createReserveOffer: typeof createReserveOffer;
   getVisibleReserveOfferById: typeof getVisibleReserveOfferById;
   revokeReserveOffer: typeof revokeReserveOffer;
+  attachReplacementToReserveOffer: typeof attachReplacementToReserveOffer;
   isTemplateGloballyUnavailableInSession: typeof isTemplateGloballyUnavailableInSession;
   listSuccessfulElementTemplateIdsForParticipantInSession: typeof listSuccessfulElementTemplateIdsForParticipantInSession;
 };
@@ -37,10 +48,17 @@ type ParticipantReserveOfferDependencies = {
 const defaultDependencies: ParticipantReserveOfferDependencies = {
   getParticipantById,
   getElementTemplateById,
+  getReserveOfferById,
+  getLatestRevokedReserveOfferForTemplate,
+  getLevelById,
+  getLevelByNumber,
+  getTemplatesForParticipant,
+  listVisibleReserveOffersByParticipant,
   listVisibleReserveOffersBySession,
   createReserveOffer,
   getVisibleReserveOfferById,
   revokeReserveOffer,
+  attachReplacementToReserveOffer,
   isTemplateGloballyUnavailableInSession,
   listSuccessfulElementTemplateIdsForParticipantInSession,
 };
@@ -51,15 +69,16 @@ export async function listVisibleReserveForParticipant(participantId: string): P
 
 export async function createVisibleReserveOffer(
   input: CreateVisibleReserveOfferInput,
-  dependencies: ParticipantReserveOfferDependencies = defaultDependencies,
+  dependencies: Partial<ParticipantReserveOfferDependencies> = {},
 ): Promise<ParticipantReserveOffer> {
-  const participant = await dependencies.getParticipantById(input.participantId);
+  const resolvedDependencies = { ...defaultDependencies, ...dependencies };
+  const participant = await resolvedDependencies.getParticipantById(input.participantId);
 
   if (!participant) {
     throw new Error("participant_not_found");
   }
 
-  const template = await dependencies.getElementTemplateById(input.templateId);
+  const template = await resolvedDependencies.getElementTemplateById(input.templateId);
 
   if (!template) {
     throw new Error("element_template_not_found");
@@ -69,7 +88,7 @@ export async function createVisibleReserveOffer(
     throw new Error("element_template_not_eligible_for_reserve");
   }
 
-  const templateUnavailable = await dependencies.isTemplateGloballyUnavailableInSession(
+  const templateUnavailable = await resolvedDependencies.isTemplateGloballyUnavailableInSession(
     participant.session_id,
     template.id,
     { requesterParticipantId: participant.id },
@@ -79,7 +98,7 @@ export async function createVisibleReserveOffer(
     throw new Error("element_template_globally_unavailable");
   }
 
-  const successfulTemplateIds = await dependencies.listSuccessfulElementTemplateIdsForParticipantInSession(
+  const successfulTemplateIds = await resolvedDependencies.listSuccessfulElementTemplateIdsForParticipantInSession(
     participant.id,
     participant.session_id,
   );
@@ -87,7 +106,7 @@ export async function createVisibleReserveOffer(
     throw new Error("element_template_blacklisted_for_participant_success");
   }
 
-  const visibleOffersInSession = await dependencies.listVisibleReserveOffersBySession(participant.session_id);
+  const visibleOffersInSession = await resolvedDependencies.listVisibleReserveOffersBySession(participant.session_id);
 
   assertVisibleReserveOfferUniqueness(visibleOffersInSession, {
     sessionId: participant.session_id,
@@ -95,7 +114,7 @@ export async function createVisibleReserveOffer(
     templateId: template.id,
   });
 
-  return dependencies.createReserveOffer({
+  return resolvedDependencies.createReserveOffer({
     session_id: participant.session_id,
     participant_id: participant.id,
     element_template_id: template.id,
@@ -123,16 +142,16 @@ export async function replaceVisibleReserveOffer(input: ReplaceVisibleReserveOff
 
 export async function replaceVisibleReserveOfferWithDependencies(
   input: ReplaceVisibleReserveOfferInput,
-  dependencies: ParticipantReserveOfferDependencies = defaultDependencies,
+  dependencies: Partial<ParticipantReserveOfferDependencies> = {},
 ): Promise<{ revoked: ParticipantReserveOffer; replacement: ParticipantReserveOffer }> {
-  return replaceVisibleReserveOfferWithDependenciesInternal(input, dependencies);
+  return replaceVisibleReserveOfferWithDependenciesInternal(input, { ...defaultDependencies, ...dependencies });
 }
 
 async function replaceVisibleReserveOfferWithDependenciesInternal(
   input: ReplaceVisibleReserveOfferInput,
   dependencies: ParticipantReserveOfferDependencies,
 ): Promise<{ revoked: ParticipantReserveOffer; replacement: ParticipantReserveOffer }> {
-  const existing = await dependencies.getVisibleReserveOfferById(input.offerId);
+  const existing = await dependencies.getReserveOfferById(input.offerId);
 
   if (!existing) {
     throw new Error("reserve_offer_not_found_or_already_revoked");
@@ -159,10 +178,70 @@ async function replaceVisibleReserveOfferWithDependenciesInternal(
     offeredAt: input.replacedAt,
   }, dependencies);
 
-  const revoked = await dependencies.revokeReserveOffer(existing.id, {
-    revokedAt: input.replacedAt,
-    replacedByOfferId: replacement.id,
-  });
+  const revoked = existing.revoked_at
+    ? await dependencies.attachReplacementToReserveOffer(existing.id, replacement.id)
+    : await dependencies.revokeReserveOffer(existing.id, {
+      revokedAt: input.replacedAt,
+      replacedByOfferId: replacement.id,
+    });
 
   return { revoked, replacement };
+}
+
+export async function refillVisibleReserveOfferForResolvedElement(
+  input: { participantId: string; sessionId: string; consumedTemplateId: string; replacedAt?: string },
+  dependencies: Partial<ParticipantReserveOfferDependencies> = {},
+): Promise<{ replaced: boolean; replacementOfferId: string | null }> {
+  const resolvedDependencies = { ...defaultDependencies, ...dependencies };
+  const participant = await resolvedDependencies.getParticipantById(input.participantId);
+  if (!participant || participant.session_id !== input.sessionId) {
+    return { replaced: false, replacementOfferId: null };
+  }
+
+  const level = participant.current_level_id
+    ? await resolvedDependencies.getLevelById(participant.current_level_id)
+    : await resolvedDependencies.getLevelByNumber(1);
+
+  if (!level) {
+    return { replaced: false, replacementOfferId: null };
+  }
+
+  const [eligibleTemplates, visibleOffers] = await Promise.all([
+    resolvedDependencies.getTemplatesForParticipant(level.level_number),
+    resolvedDependencies.listVisibleReserveOffersByParticipant(participant.id),
+  ]);
+
+  const visibleTemplateIds = new Set(visibleOffers.map((offer) => offer.element_template_id));
+
+  const replacementTemplate = eligibleTemplates.find((template) =>
+    template.can_appear_in_reserve
+    && template.is_active
+    && template.id !== input.consumedTemplateId
+    && !visibleTemplateIds.has(template.id));
+
+  if (!replacementTemplate) {
+    return { replaced: false, replacementOfferId: null };
+  }
+
+  const consumedOffer = await resolvedDependencies.getLatestRevokedReserveOfferForTemplate(
+    participant.id,
+    input.sessionId,
+    input.consumedTemplateId,
+  );
+
+  if (!consumedOffer) {
+    return { replaced: false, replacementOfferId: null };
+  }
+
+  try {
+    const { replacement } = await replaceVisibleReserveOfferWithDependencies({
+      offerId: consumedOffer.id,
+      replacementTemplateId: replacementTemplate.id,
+      replacedAt: input.replacedAt,
+    }, resolvedDependencies);
+
+    return { replaced: true, replacementOfferId: replacement.id };
+  } catch {
+    return { replaced: false, replacementOfferId: null };
+  }
 }

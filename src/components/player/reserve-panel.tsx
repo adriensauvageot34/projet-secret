@@ -6,7 +6,7 @@ import type { PlayerReserveTemplate } from "@/hooks/use-player-runtime";
 type ReservePanelProps = {
   templates: PlayerReserveTemplate[];
   pendingTemplateId: string | null;
-  onActivate: (templateId: string) => Promise<void>;
+  onActivate: (reserveOfferId: string) => Promise<void>;
 };
 
 export function ReservePanel({ templates, pendingTemplateId, onActivate }: ReservePanelProps) {
@@ -18,16 +18,16 @@ export function ReservePanel({ templates, pendingTemplateId, onActivate }: Reser
       ) : (
         <div className="space-y-2">
           {templates.map((template) => (
-            <div key={template.id} className="rounded border border-slate-700 p-2">
+            <div key={template.offerId} className="rounded border border-slate-700 p-2">
               <p className="text-sm font-medium">{template.name}</p>
               <p className="text-xs text-slate-400">{template.code} · {template.elementType} · diff {template.difficulty}</p>
               <p className="text-xs text-slate-400">Durée {template.durationSeconds}s · validation {template.validationMode}</p>
               <Button
                 className="mt-2 w-full"
-                disabled={pendingTemplateId === template.id}
-                onClick={() => void onActivate(template.id)}
+                disabled={pendingTemplateId === template.offerId}
+                onClick={() => void onActivate(template.offerId)}
               >
-                {pendingTemplateId === template.id ? "Activation..." : "Activer"}
+                {pendingTemplateId === template.offerId ? "Activation..." : "Activer"}
               </Button>
             </div>
           ))}

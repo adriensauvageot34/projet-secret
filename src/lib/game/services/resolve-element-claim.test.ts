@@ -58,6 +58,7 @@ function makeDeps(params: {
   const updateComboCalls: boolean[] = [];
   let recomputeParticipantSlotsCalls = 0;
   let updateParticipantLevelCalls = 0;
+  let refillReserveCalls = 0;
 
   return {
     resolveCalls,
@@ -65,6 +66,7 @@ function makeDeps(params: {
     updateComboCalls,
     getRecomputeParticipantSlotsCalls: () => recomputeParticipantSlotsCalls,
     getUpdateParticipantLevelCalls: () => updateParticipantLevelCalls,
+    getRefillReserveCalls: () => refillReserveCalls,
     deps: {
       claimResult: async () => claimedInstance,
       getElementTemplateById: async () =>
@@ -123,6 +125,10 @@ function makeDeps(params: {
         return null;
       },
       consumeFirstArmedAdvantage: async (_input: { participantId: string; effectCode: string }) => null,
+      refillVisibleReserveOfferForResolvedElement: async () => {
+        refillReserveCalls += 1;
+        return { replaced: true, replacementOfferId: "offer-new" };
+      },
       now: () => new Date(params.nowIso ?? "2026-01-01T00:05:00.000Z"),
     },
   };
@@ -159,7 +165,7 @@ function makeTemplate(
 }
 
 test("activation puis success auto-validé => score_event + score/runtime chain", async () => {
-  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "success",
     validationMode: "auto",
     templateElementType: "mission",
@@ -184,10 +190,11 @@ test("activation puis success auto-validé => score_event + score/runtime chain"
   assert.deepEqual(updateComboCalls, [true]);
   assert.equal(getRecomputeParticipantSlotsCalls(), 1);
   assert.equal(getUpdateParticipantLevelCalls(), 1);
+  assert.equal(getRefillReserveCalls(), 1);
 });
 
 test("activation puis fail auto-validé => pas de gain indu, runtime mis à jour", async () => {
-  const { deps, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+  const { deps, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "fail",
     validationMode: "auto",
   });
@@ -201,6 +208,7 @@ test("activation puis fail auto-validé => pas de gain indu, runtime mis à jour
   assert.deepEqual(updateComboCalls, [false]);
   assert.equal(getRecomputeParticipantSlotsCalls(), 1);
   assert.equal(getUpdateParticipantLevelCalls(), 1);
+  assert.equal(getRefillReserveCalls(), 1);
 });
 
 test("activation puis broken auto-validé => penalty cohérente sur constraint", async () => {
@@ -226,7 +234,7 @@ test("activation puis broken auto-validé => penalty cohérente sur constraint",
 });
 
 test("activation puis skipped => état cooldown + score_event penalty", async () => {
-  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls } = makeDeps({
+  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "skipped",
     validationMode: "gm",
     durationSeconds: 125,
@@ -249,6 +257,7 @@ test("activation puis skipped => état cooldown + score_event penalty", async ()
     },
   ]);
   assert.deepEqual(updateComboCalls, [false]);
+  assert.equal(getRefillReserveCalls(), 1);
 });
 
 test("buff armé free_skip: neutralise uniquement le prochain skip_penalty puis se consomme", async () => {
@@ -321,7 +330,7 @@ test("skip sans skip_available_at => refusé", async () => {
 });
 
 test("claim proof pending => claimed_result oui, final_result non, score non modifié", async () => {
-  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "success",
     validationMode: "proof",
   });
@@ -337,10 +346,11 @@ test("claim proof pending => claimed_result oui, final_result non, score non mod
   assert.equal(updateComboCalls.length, 0);
   assert.equal(getRecomputeParticipantSlotsCalls(), 0);
   assert.equal(getUpdateParticipantLevelCalls(), 0);
+  assert.equal(getRefillReserveCalls(), 0);
 });
 
 test("claim gm pending => claimed_result oui, final_result non, score non modifié", async () => {
-  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls } = makeDeps({
+  const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRecomputeParticipantSlotsCalls, getUpdateParticipantLevelCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "broken",
     validationMode: "gm",
   });
@@ -356,6 +366,7 @@ test("claim gm pending => claimed_result oui, final_result non, score non modifi
   assert.equal(updateComboCalls.length, 0);
   assert.equal(getRecomputeParticipantSlotsCalls(), 0);
   assert.equal(getUpdateParticipantLevelCalls(), 0);
+  assert.equal(getRefillReserveCalls(), 0);
 });
 
 test("claim refusé si instance déjà terminalement résolue", async () => {
