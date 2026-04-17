@@ -456,3 +456,61 @@ test("un reserveOfferId issu du runtime est activable immédiatement dans le mê
     },
   ]);
 });
+
+test("activateElement remplit immédiatement la réserve après consommation de l'offre activée", async () => {
+  const visibleReserve = [
+    { id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1", revoked_at: null as string | null },
+    { id: "offer-2", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-2", revoked_at: null as string | null },
+    { id: "offer-3", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-3", revoked_at: null as string | null },
+    { id: "offer-4", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-4", revoked_at: null as string | null },
+  ];
+  const expectedReserveSize = visibleReserve.length;
+  const operationOrder: string[] = [];
+
+  await activateElement("participant-1", "offer-1", undefined, false, {
+    loadParticipant: async () => ({ ...participant }),
+    loadSession: async () => ({ ...session }),
+    loadVisibleOffer: async (offerId) => (
+      visibleReserve.find((offer) => offer.id === offerId && offer.revoked_at === null) ?? null
+    ),
+    loadTemplate: async () => ({ ...missionTemplate }),
+    loadLevel: async () => ({ ...level }),
+    listOccupiedSlots: async () => [],
+    createInstance: async (input) =>
+      makeInstance({
+        id: "instance-refill-now",
+        element_template_id: input.templateId,
+        active_slot_index: input.slotIndex,
+      }),
+    consumeOffer: async (offerId, revokedAt) => {
+      operationOrder.push(`consume:${offerId}`);
+      const consumed = visibleReserve.find((offer) => offer.id === offerId);
+      if (!consumed) throw new Error("missing consumed offer");
+      consumed.revoked_at = revokedAt;
+    },
+    refillOfferAfterActivation: async () => {
+      operationOrder.push("refill");
+      visibleReserve.push({
+        id: "offer-5",
+        session_id: "session-1",
+        participant_id: "participant-1",
+        element_template_id: "template-5",
+        revoked_at: null,
+      });
+
+      return {
+        replaced: true,
+        replacementOfferId: "offer-5",
+        reason: "replaced",
+        debugMessage: "replacement created immediately",
+      };
+    },
+    now: () => new Date("2026-01-01T00:00:00.000Z"),
+  });
+
+  const visibleCountAfterActivation = visibleReserve.filter((offer) => offer.revoked_at === null).length;
+  assert.equal(visibleCountAfterActivation, expectedReserveSize);
+  assert.equal(visibleReserve.some((offer) => offer.id === "offer-1" && offer.revoked_at !== null), true);
+  assert.equal(visibleReserve.some((offer) => offer.id === "offer-5" && offer.revoked_at === null), true);
+  assert.deepEqual(operationOrder, ["consume:offer-1", "refill"]);
+});
