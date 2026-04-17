@@ -18,6 +18,10 @@ export function sanitizeRuntimeActiveElements<T extends RuntimeLike>(runtime: T)
   } as T;
 }
 
+export function applyServerRuntimeSnapshot<T extends RuntimeLike>(runtime: T): T {
+  return sanitizeRuntimeActiveElements(runtime);
+}
+
 export function applyClaimRuntimeOptimisticUpdate<T extends RuntimeLike>(
   runtime: T | null,
   params: { instanceId: string; claimedResult: ClaimedResult; finalResolved: boolean },
