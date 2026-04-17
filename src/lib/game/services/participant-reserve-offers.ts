@@ -6,6 +6,7 @@ import {
 } from "@/lib/db/queries/participant-reserve-offers";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getElementTemplateById } from "@/lib/db/queries/element-templates";
+import { listSuccessfulElementTemplateIdsForParticipantInSession } from "@/lib/db/queries/element-instances";
 import { assertVisibleReserveOfferUniqueness } from "@/lib/game/rules/reserve";
 import { isTemplateGloballyUnavailableInSession } from "@/lib/game/services/template-global-availability";
 import type { ParticipantReserveOffer, ParticipantReserveOfferWithTemplate } from "@/types/domain";
@@ -30,6 +31,7 @@ type ParticipantReserveOfferDependencies = {
   getVisibleReserveOfferById: typeof getVisibleReserveOfferById;
   revokeReserveOffer: typeof revokeReserveOffer;
   isTemplateGloballyUnavailableInSession: typeof isTemplateGloballyUnavailableInSession;
+  listSuccessfulElementTemplateIdsForParticipantInSession: typeof listSuccessfulElementTemplateIdsForParticipantInSession;
 };
 
 const defaultDependencies: ParticipantReserveOfferDependencies = {
@@ -40,6 +42,7 @@ const defaultDependencies: ParticipantReserveOfferDependencies = {
   getVisibleReserveOfferById,
   revokeReserveOffer,
   isTemplateGloballyUnavailableInSession,
+  listSuccessfulElementTemplateIdsForParticipantInSession,
 };
 
 export async function listVisibleReserveForParticipant(participantId: string): Promise<ParticipantReserveOfferWithTemplate[]> {
@@ -74,6 +77,14 @@ export async function createVisibleReserveOffer(
 
   if (templateUnavailable) {
     throw new Error("element_template_globally_unavailable");
+  }
+
+  const successfulTemplateIds = await dependencies.listSuccessfulElementTemplateIdsForParticipantInSession(
+    participant.id,
+    participant.session_id,
+  );
+  if (successfulTemplateIds.includes(template.id)) {
+    throw new Error("element_template_blacklisted_for_participant_success");
   }
 
   const visibleOffersInSession = await dependencies.listVisibleReserveOffersBySession(participant.session_id);
