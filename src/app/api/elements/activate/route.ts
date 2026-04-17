@@ -14,11 +14,18 @@ export async function POST(request: Request) {
       isFake?: boolean;
     };
     participantId = body.participantId;
-    reserveOfferId = body.reserveOfferId ?? body.offerId ?? body.templateId ?? "";
+    reserveOfferId = body.reserveOfferId ?? "";
 
     if (!participantId || !reserveOfferId) {
       throw new Error(`Missing activation payload fields (participantId=${participantId || "missing"}, reserveOfferId=${reserveOfferId || "missing"})`);
     }
+
+    console.info("[elements.activate] payload", {
+      participantId,
+      reserveOfferId,
+      hasLegacyOfferId: typeof body.offerId === "string" && body.offerId.length > 0,
+      hasLegacyTemplateId: typeof body.templateId === "string" && body.templateId.length > 0,
+    });
 
     const result = await activateElement(
       participantId,

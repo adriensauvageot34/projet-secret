@@ -149,6 +149,12 @@ export async function GET(_request: Request, context: { params: { participantId:
       validationMode: offer.template.validation_mode,
     }));
 
+    console.info("[player-runtime] reserve offers response", {
+      participantId: participant.id,
+      reserveOfferIds: reserveTemplates.map((offer) => offer.reserveOfferId),
+      reserveTemplateIds: reserveTemplates.map((offer) => offer.templateId),
+    });
+
     const shop = shopTemplates.map((template) => {
       const check = canParticipantBuyAdvantage(
         template,
