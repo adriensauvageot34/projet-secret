@@ -239,6 +239,21 @@ test("activation puis broken auto-validé => penalty cohérente sur constraint",
   assert.deepEqual(updateComboCalls, [false]);
 });
 
+test("contrainte fail avant expiration => échec immédiat", async () => {
+  const { deps, resolveCalls, createScoreEventCalls } = makeDeps({
+    claimResult: "fail",
+    validationMode: "auto",
+    templateElementType: "constraint",
+  });
+
+  const result = await resolveElementClaim("instance-1", "fail", deps);
+
+  assert.equal(result.finalResolved, true);
+  assert.equal(result.instance.final_result, "fail");
+  assert.equal(resolveCalls.length, 1);
+  assert.deepEqual(createScoreEventCalls, []);
+});
+
 test("activation puis skipped => état cooldown + score_event penalty", async () => {
   const { deps, resolveCalls, createScoreEventCalls, updateComboCalls, getRefillReserveCalls } = makeDeps({
     claimResult: "skipped",
