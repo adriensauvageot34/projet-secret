@@ -134,6 +134,25 @@ export interface ElementInstance {
   updated_at: string;
 }
 
+export interface ParticipantReserveOffer {
+  id: string;
+  session_id: string;
+  participant_id: string;
+  element_template_id: string;
+  offered_at: string;
+  revoked_at: string | null;
+  replaced_by_offer_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ParticipantReserveOfferWithTemplate extends ParticipantReserveOffer {
+  template: Pick<
+    ElementTemplate,
+    "id" | "name" | "code" | "element_type" | "difficulty" | "duration_seconds" | "validation_mode"
+  >;
+}
+
 export type AdvantageEffectFamily =
   | "investigation"
   | "tempo"

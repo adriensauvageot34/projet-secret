@@ -5,6 +5,8 @@ import type {
   AdvantageInstanceWithTemplate,
   AdvantageTargetType,
   AdvantageTemplate,
+  ParticipantReserveOffer,
+  ParticipantReserveOfferWithTemplate,
   Participant,
 } from "@/types/domain";
 
@@ -78,3 +80,23 @@ export type ParticipantInsert = Omit<Participant, "id" | "created_at" | "updated
 };
 
 export type ParticipantUpdate = Partial<Omit<ParticipantInsert, "session_id" | "player_id">>;
+
+export interface ParticipantReserveOfferRow extends ParticipantReserveOffer {}
+
+export type ParticipantReserveOfferInsert = Omit<
+  ParticipantReserveOffer,
+  "id" | "offered_at" | "revoked_at" | "replaced_by_offer_id" | "created_at" | "updated_at"
+> & {
+  id?: string;
+  offered_at?: string;
+  revoked_at?: string | null;
+  replaced_by_offer_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ParticipantReserveOfferUpdate = Partial<
+  Pick<ParticipantReserveOffer, "revoked_at" | "replaced_by_offer_id" | "updated_at">
+>;
+
+export interface ParticipantReserveOfferWithTemplateRow extends ParticipantReserveOfferWithTemplate {}

@@ -10,6 +10,7 @@ import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { buildVisibleReserveTemplates } from "@/lib/game/services/reserve-templates";
 import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
 import { getSessionById } from "@/lib/db/queries/sessions";
+import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
 
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
@@ -106,7 +107,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
@@ -115,6 +116,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       listAccusationTargets(participant.session_id, participant.id),
       getActiveTemplates(),
       listAdvantageElementTargets(participant.session_id, participant.id),
+      listVisibleReserveForParticipant(participant.id),
     ]);
 
     const session = await getSessionById(participant.session_id);
@@ -143,7 +145,7 @@ export async function GET(_request: Request, context: { params: { participantId:
         };
       });
 
-    const reserveTemplates = buildVisibleReserveTemplates(templatesForLevel, level).map((template) => ({
+    const computedReserveTemplates = buildVisibleReserveTemplates(templatesForLevel, level).map((template) => ({
       id: template.id,
       name: template.name,
       code: template.code,
@@ -152,6 +154,18 @@ export async function GET(_request: Request, context: { params: { participantId:
       durationSeconds: template.duration_seconds,
       validationMode: template.validation_mode,
     }));
+
+    const persistedReserveTemplates = persistedVisibleReserveOffers.map((offer) => ({
+      id: offer.template.id,
+      name: offer.template.name,
+      code: offer.template.code,
+      elementType: offer.template.element_type,
+      difficulty: offer.template.difficulty,
+      durationSeconds: offer.template.duration_seconds,
+      validationMode: offer.template.validation_mode,
+    }));
+
+    const reserveTemplates = persistedReserveTemplates.length > 0 ? persistedReserveTemplates : computedReserveTemplates;
 
     const shop = shopTemplates.map((template) => {
       const check = canParticipantBuyAdvantage(
