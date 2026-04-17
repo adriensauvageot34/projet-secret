@@ -14,7 +14,11 @@ with duplicate_score_events as (
       and event_type = 'manual_adjustment'
   ) ranked
   where rn > 1
-), duplicate_token_events as (
+)
+delete from score_events
+where id in (select id from duplicate_score_events);
+
+with duplicate_token_events as (
   select id
   from (
     select
@@ -29,9 +33,6 @@ with duplicate_score_events as (
   ) ranked
   where rn > 1
 )
-delete from score_events
-where id in (select id from duplicate_score_events);
-
 delete from token_events
 where id in (select id from duplicate_token_events);
 
