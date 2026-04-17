@@ -43,6 +43,9 @@ type ResolveElementClaimDependencies = {
 };
 
 export type ElementClaimFlow = "auto_resolved" | "proof_pending" | "gm_pending";
+export type ResolveElementClaimOptions = {
+  forceAutoResolve?: boolean;
+};
 
 export type ResolveElementClaimOutput = {
   ok: true;
@@ -311,6 +314,7 @@ export async function resolveElementClaim(
   instanceId: string,
   claimedResult: ClaimedResult,
   dependencies: ResolveElementClaimDependencies = defaultDependencies,
+  options: ResolveElementClaimOptions = {},
 ): Promise<ResolveElementClaimOutput> {
   if (dependencies.getElementInstanceById) {
     const existingInstance = await dependencies.getElementInstanceById(instanceId);
@@ -334,7 +338,7 @@ export async function resolveElementClaim(
     assertSkipAvailable(claimedInstance, dependencies.now());
   }
 
-  const shouldAutoResolve = claimedResult === "skipped" || template.validation_mode === "auto";
+  const shouldAutoResolve = options.forceAutoResolve || claimedResult === "skipped" || template.validation_mode === "auto";
 
   if (!shouldAutoResolve) {
     return {
@@ -347,8 +351,8 @@ export async function resolveElementClaim(
   }
 
   const finalResult = mapClaimedToFinalResult(claimedResult);
-  const options = finalResult === "skipped" ? { skippedCooldownMinutes: computeSkippedCooldownMinutes(template) } : undefined;
-  const resolvedInstance = await dependencies.resolveElement(instanceId, finalResult, options);
+  const resolveOptions = finalResult === "skipped" ? { skippedCooldownMinutes: computeSkippedCooldownMinutes(template) } : undefined;
+  const resolvedInstance = await dependencies.resolveElement(instanceId, finalResult, resolveOptions);
   await applyFinalResolutionEffects(resolvedInstance, template, dependencies);
 
   return {

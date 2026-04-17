@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
 import { listActiveElementInstancesByParticipant } from "@/lib/db/queries/element-instances";
-import { getActiveTemplates, getTemplatesForParticipant, listElementTemplatesByIds } from "@/lib/db/queries/element-templates";
+import { getActiveTemplates, listElementTemplatesByIds } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
@@ -12,6 +12,7 @@ import { getSessionById } from "@/lib/db/queries/sessions";
 import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
 import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
 import { mapPlayerActiveElements } from "@/lib/game/mappers/participant-runtime";
+import { resolveExpiredElementsForParticipant } from "@/lib/game/services/resolve-expired-elements";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -118,9 +119,9 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400, headers: NO_STORE_HEADERS });
     }
 
-    const [activeInstances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
+    const [, activeInstances, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
+      resolveExpiredElementsForParticipant(participant.id, participant.session_id),
       listActiveElementInstancesByParticipant(participant.id, participant.session_id),
-      getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
       getVisibleShopTemplatesForLevel(level.level_number),
       listSessionRankingParticipants(participant.session_id),
