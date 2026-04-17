@@ -30,6 +30,14 @@ test("hook joueur envoie reserveOfferId vers l'API d'activation", () => {
   assert.doesNotMatch(activationCallBlock, /templateId:/);
 });
 
+test("hook joueur applique le runtime serveur sans fusion locale de réserve", () => {
+  const hook = readFileSync("src/hooks/use-player-runtime.ts", "utf8");
+
+  assert.match(hook, /const sanitized = applyServerRuntimeSnapshot\(payload\.data\);/);
+  assert.match(hook, /setRuntime\(\(\) => \{/);
+  assert.doesNotMatch(hook, /reserveTemplates:\s*\[\.\.\.current\.reserveTemplates/);
+});
+
 test("route d'activation refuse les alias legacy et exige reserveOfferId", () => {
   const route = readFileSync("src/app/api/elements/activate/route.ts", "utf8");
 

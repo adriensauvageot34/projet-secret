@@ -12,8 +12,8 @@ import type {
 import type { ClaimedResult } from "@/lib/game/enums";
 import type { LiveRankingEntry } from "@/lib/game/services/live-ranking";
 import {
+  applyServerRuntimeSnapshot,
   applyClaimRuntimeOptimisticUpdate,
-  sanitizeRuntimeActiveElements,
 } from "@/lib/game/services/player-runtime-client-state";
 
 export type PlayerActiveElement = {
@@ -233,12 +233,19 @@ export function usePlayerRuntime(participantId: string) {
       }
 
       latestAppliedSequenceRef.current = sequence;
-      const sanitized = sanitizeRuntimeActiveElements(payload.data);
+      const sanitized = applyServerRuntimeSnapshot(payload.data);
       console.info("[player-runtime] reserve offers loaded", {
         participantId,
         reserveOfferIds: sanitized.reserveTemplates.map((template) => template.reserveOfferId),
       });
-      setRuntime(sanitized);
+      setRuntime(() => {
+        console.info("[player-runtime] reserve offers applied to client state", {
+          participantId,
+          sequence,
+          reserveOfferIds: sanitized.reserveTemplates.map((template) => template.reserveOfferId),
+        });
+        return sanitized;
+      });
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Erreur inconnue de chargement runtime joueur");
