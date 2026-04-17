@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildGmFinalSummary, mapGmRuntimeElement } from "@/lib/game/services/get-gm-runtime-view";
 
 function makeRawElementRow(overrides: Partial<Parameters<typeof mapGmRuntimeElement>[0]> = {}): Parameters<typeof mapGmRuntimeElement>[0] {
@@ -103,4 +104,16 @@ test("résumé final GM: exclut le GM, expose winner/podium/bottom5", () => {
   assert.equal(summary.winner?.participantId, "p2");
   assert.deepEqual(summary.podium.map((entry) => entry.participantId), ["p2", "p1"]);
   assert.deepEqual(summary.bottomFive.map((entry) => entry.participantId), ["p2", "p1"]);
+});
+
+test("lecture GM des accusations: fallback FK suspected_template_id + joins participants/element_instances explicites", () => {
+  const accusationQuery = readFileSync("src/lib/db/queries/accusations.ts", "utf8");
+
+  assert.match(accusationQuery, /suspected_template:element_templates!accusations_suspected_template_id_fkey\(name\)/);
+  assert.match(accusationQuery, /suspected_template:element_templates!accusations_suspect_template_id_fkey\(name\)/);
+  assert.match(accusationQuery, /accuser:participants!accusations_accuser_participant_id_fkey\(display_name\)/);
+  assert.match(accusationQuery, /accused:participants!accusations_accused_participant_id_fkey\(display_name\)/);
+  assert.match(accusationQuery, /adjudicated_by:participants!accusations_adjudicated_by_participant_id_fkey\(display_name\)/);
+  assert.match(accusationQuery, /related_element_instance:element_instances!accusations_related_element_instance_id_fkey\(is_fake, state\)/);
+  assert.match(accusationQuery, /queryAccusationsWithRelationshipFallback/);
 });
