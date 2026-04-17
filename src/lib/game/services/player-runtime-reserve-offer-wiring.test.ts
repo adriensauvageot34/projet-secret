@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createReserveActivateClickHandler } from "@/components/player/reserve-panel";
 
 test("player-runtime mappe chaque carte réserve avec participant_reserve_offers.id", () => {
   const route = readFileSync("src/app/api/player-runtime/[participantId]/route.ts", "utf8");
@@ -13,9 +14,29 @@ test("player-runtime mappe chaque carte réserve avec participant_reserve_offers
 test("reserve panel rend et active les cartes via reserveOfferId exact", () => {
   const panel = readFileSync("src/components/player/reserve-panel.tsx", "utf8");
 
-  assert.match(panel, /key=\{template\.reserveOfferId\}/);
-  assert.match(panel, /data-reserve-offer-id=\{template\.reserveOfferId\}/);
-  assert.match(panel, /onClick=\{\(\) => void onActivate\(template\.reserveOfferId\)\}/);
+  assert.match(panel, /const displayedReserveOfferId = template\.reserveOfferId/);
+  assert.match(panel, /key=\{displayedReserveOfferId\}/);
+  assert.match(panel, /data-reserve-offer-id=\{displayedReserveOfferId\}/);
+  assert.match(panel, /offerId: \{displayedReserveOfferId\}/);
+  assert.match(panel, /onClick=\{handleActivateClick\}/);
+});
+
+test("createReserveActivateClickHandler envoie l'id affiché sur la carte", async () => {
+  const sentIds: string[] = [];
+  const displayedReserveOfferId = "offer-X";
+  const onActivate = async (reserveOfferId: string) => {
+    sentIds.push(reserveOfferId);
+  };
+
+  const handleClick = createReserveActivateClickHandler({
+    displayedReserveOfferId,
+    onActivate,
+  });
+
+  handleClick();
+  await Promise.resolve();
+
+  assert.deepEqual(sentIds, [displayedReserveOfferId]);
 });
 
 test("hook joueur envoie reserveOfferId vers l'API d'activation", () => {

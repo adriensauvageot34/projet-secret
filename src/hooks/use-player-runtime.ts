@@ -281,7 +281,7 @@ export function usePlayerRuntime(participantId: string) {
 
       console.info("[player-runtime] activate reserve offer", {
         participantId,
-        reserveOfferId,
+        sentReserveOfferId: reserveOfferId,
         visibleReserveOfferIds: runtime?.reserveTemplates.map((template) => template.reserveOfferId) ?? [],
       });
 
