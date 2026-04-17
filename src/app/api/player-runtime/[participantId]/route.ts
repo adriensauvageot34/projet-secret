@@ -13,6 +13,16 @@ import { listVisibleReserveForParticipant } from "@/lib/game/services/participan
 import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
 import { mapPlayerActiveElements } from "@/lib/game/mappers/participant-runtime";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const;
+
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -97,7 +107,7 @@ export async function GET(_request: Request, context: { params: { participantId:
     const participant = await getParticipantById(context.params.participantId);
 
     if (!participant) {
-      return NextResponse.json({ ok: false, error: "Participant not found" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "Participant not found" }, { status: 404, headers: NO_STORE_HEADERS });
     }
 
     const level = participant.current_level_id
@@ -105,7 +115,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       : await getLevelByNumber(1);
 
     if (!level) {
-      return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400, headers: NO_STORE_HEADERS });
     }
 
     const [activeInstances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
@@ -211,14 +221,14 @@ export async function GET(_request: Request, context: { params: { participantId:
         accusableTemplates,
         advantageElementTargets,
       },
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
         error: error instanceof Error ? error.message : "Unknown player runtime retrieval error",
       },
-      { status: 400 },
+      { status: 400, headers: NO_STORE_HEADERS },
     );
   }
 }

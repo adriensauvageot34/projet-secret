@@ -226,7 +226,16 @@ export function usePlayerRuntime(participantId: string) {
         setIsRefreshing(true);
       }
 
-      const response = await fetch(`/api/player-runtime/${participantId}`, { cache: "no-store" });
+      const response = await fetch(`/api/player-runtime/${participantId}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        next: {
+          revalidate: 0,
+        },
+      });
       const payload = (await response.json()) as ApiResponse<PlayerRuntimeData>;
 
       if (!response.ok || !payload.ok) {
