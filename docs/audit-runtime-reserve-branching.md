@@ -121,3 +121,13 @@ Date d'audit: 2026-04-17
 - **Déjà OK**: modèle DB des offres visibles, règles d’unicité inter-joueurs, service de création/remplacement d’offre, bootstrap par bucket côté service.
 - **Partiel**: lecture runtime (persisté + fallback calculé).
 - **Manquant critique**: activation depuis offre persistée, consommation d’offre à activation, remplacement automatique à résolution terminale, branchement automatique du bootstrap.
+
+---
+
+## Addendum stabilisation MVP (2026-04-17)
+
+- Le refill immédiat est désormais piloté par une règle explicite “sortie du flux” côté service de résolution (`doesElementExitFlowAndTriggerRefill`), appliquée à un point unique.
+- Les statuts `proof_pending` et `gm_pending` ne déclenchent pas de refill (élément non terminal).
+- Les échecs de remplacement ne sont plus silencieux : retour structuré `reason + debugMessage` + log serveur `[reserve-refill]`.
+- Côté DB, l’unicité visible inter-joueurs est déjà blindée par index partiels (`participant_reserve_offers_session_template_visible_unique`), ce qui couvre le besoin MVP sans refactor transactionnel lourd supplémentaire.
+- La diversité du bootstrap reste “maximale sous contraintes” : en cas de stock insuffisant, le service retourne `shortages` explicites au lieu d’imposer une garantie absolue impossible.

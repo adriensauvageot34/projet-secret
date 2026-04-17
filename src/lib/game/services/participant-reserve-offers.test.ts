@@ -225,8 +225,8 @@ test("reserve refill: succès => remplacement immédiat via offre consommée", a
       getElementTemplateById: async (templateId: string) => makeTemplate({ id: templateId }),
       getReserveOfferById: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
       getLatestRevokedReserveOfferForTemplate: async () => makeOffer({ id: "offer-consumed", element_template_id: "template-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
-      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
-      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
       getTemplatesForParticipant: async () => [
         makeTemplate({ id: "template-consumed" }),
         makeTemplate({ id: "template-replacement", code: "TMP-2" }),
@@ -244,6 +244,7 @@ test("reserve refill: succès => remplacement immédiat via offre consommée", a
 
   assert.equal(result.replaced, true);
   assert.equal(result.replacementOfferId, "offer-new");
+  assert.equal(result.reason, "replaced");
 });
 
 test("reserve refill: aucun candidat => pas de crash", async () => {
@@ -258,8 +259,8 @@ test("reserve refill: aucun candidat => pas de crash", async () => {
       getElementTemplateById: async (templateId: string) => makeTemplate({ id: templateId }),
       getReserveOfferById: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
       getLatestRevokedReserveOfferForTemplate: async () => makeOffer({ id: "offer-consumed", element_template_id: "template-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
-      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
-      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
       getTemplatesForParticipant: async () => [makeTemplate({ id: "template-consumed" })],
       listVisibleReserveOffersByParticipant: async () => [],
       listVisibleReserveOffersBySession: async () => [],
@@ -274,4 +275,39 @@ test("reserve refill: aucun candidat => pas de crash", async () => {
 
   assert.equal(result.replaced, false);
   assert.equal(result.replacementOfferId, null);
+  assert.equal(result.reason, "no_eligible_replacement_template");
+  assert.match(result.debugMessage, /no reserve-eligible replacement template/i);
+});
+
+test("reserve refill: erreur de remplacement => raison explicite (pas silencieux)", async () => {
+  const result = await refillVisibleReserveOfferForResolvedElement(
+    {
+      participantId: "participant-a",
+      sessionId: "session-1",
+      consumedTemplateId: "template-consumed",
+    },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-a" }),
+      getElementTemplateById: async (templateId: string) => makeTemplate({ id: templateId }),
+      getReserveOfferById: async () => makeOffer({ id: "offer-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLatestRevokedReserveOfferForTemplate: async () => makeOffer({ id: "offer-consumed", element_template_id: "template-consumed", revoked_at: "2026-01-01T10:01:00.000Z" }),
+      getLevelById: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getLevelByNumber: async () => ({ id: "level-1", level_number: 1, label: "L1", min_score: 0, max_score: 99, shop_tier_max: 1, mission_difficulty_max: 2, constraint_difficulty_max: 2, fake_elements_unlocked: false, missions_visible_per_difficulty: 1, constraints_visible_per_difficulty: 1, privilege_text: "", visible_order: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
+      getTemplatesForParticipant: async () => [makeTemplate({ id: "template-replacement", code: "TMP-2" })],
+      listVisibleReserveOffersByParticipant: async () => [],
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async () => {
+        throw new Error("db_insert_failed");
+      },
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer(),
+      attachReplacementToReserveOffer: async () => makeOffer(),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
+    },
+  );
+
+  assert.equal(result.replaced, false);
+  assert.equal(result.reason, "replacement_failed");
+  assert.match(result.debugMessage, /db_insert_failed/);
 });

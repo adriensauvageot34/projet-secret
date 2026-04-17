@@ -191,11 +191,27 @@ async function replaceVisibleReserveOfferWithDependenciesInternal(
 export async function refillVisibleReserveOfferForResolvedElement(
   input: { participantId: string; sessionId: string; consumedTemplateId: string; replacedAt?: string },
   dependencies: Partial<ParticipantReserveOfferDependencies> = {},
-): Promise<{ replaced: boolean; replacementOfferId: string | null }> {
+): Promise<{
+  replaced: boolean;
+  replacementOfferId: string | null;
+  reason:
+    | "replaced"
+    | "participant_not_found_or_cross_session"
+    | "level_not_found"
+    | "no_eligible_replacement_template"
+    | "consumed_offer_not_found"
+    | "replacement_failed";
+  debugMessage: string;
+}> {
   const resolvedDependencies = { ...defaultDependencies, ...dependencies };
   const participant = await resolvedDependencies.getParticipantById(input.participantId);
   if (!participant || participant.session_id !== input.sessionId) {
-    return { replaced: false, replacementOfferId: null };
+    return {
+      replaced: false,
+      replacementOfferId: null,
+      reason: "participant_not_found_or_cross_session",
+      debugMessage: "participant is missing or linked to another session",
+    };
   }
 
   const level = participant.current_level_id
@@ -203,7 +219,12 @@ export async function refillVisibleReserveOfferForResolvedElement(
     : await resolvedDependencies.getLevelByNumber(1);
 
   if (!level) {
-    return { replaced: false, replacementOfferId: null };
+    return {
+      replaced: false,
+      replacementOfferId: null,
+      reason: "level_not_found",
+      debugMessage: "participant level is missing; refill cannot compute eligible templates",
+    };
   }
 
   const [eligibleTemplates, visibleOffers] = await Promise.all([
@@ -220,7 +241,12 @@ export async function refillVisibleReserveOfferForResolvedElement(
     && !visibleTemplateIds.has(template.id));
 
   if (!replacementTemplate) {
-    return { replaced: false, replacementOfferId: null };
+    return {
+      replaced: false,
+      replacementOfferId: null,
+      reason: "no_eligible_replacement_template",
+      debugMessage: "no reserve-eligible replacement template matches current participant constraints",
+    };
   }
 
   const consumedOffer = await resolvedDependencies.getLatestRevokedReserveOfferForTemplate(
@@ -230,7 +256,12 @@ export async function refillVisibleReserveOfferForResolvedElement(
   );
 
   if (!consumedOffer) {
-    return { replaced: false, replacementOfferId: null };
+    return {
+      replaced: false,
+      replacementOfferId: null,
+      reason: "consumed_offer_not_found",
+      debugMessage: "no consumed reserve offer found for the resolved template",
+    };
   }
 
   try {
@@ -240,8 +271,18 @@ export async function refillVisibleReserveOfferForResolvedElement(
       replacedAt: input.replacedAt,
     }, resolvedDependencies);
 
-    return { replaced: true, replacementOfferId: replacement.id };
-  } catch {
-    return { replaced: false, replacementOfferId: null };
+    return {
+      replaced: true,
+      replacementOfferId: replacement.id,
+      reason: "replaced",
+      debugMessage: "replacement offer created successfully",
+    };
+  } catch (error) {
+    return {
+      replaced: false,
+      replacementOfferId: null,
+      reason: "replacement_failed",
+      debugMessage: error instanceof Error ? error.message : "unknown replacement error",
+    };
   }
 }

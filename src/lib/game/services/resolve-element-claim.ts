@@ -52,6 +52,21 @@ export type ResolveElementClaimOutput = {
   finalResolved: boolean;
 };
 
+const FLOW_EXIT_STATES_TRIGGERING_REFILL = new Set<ElementInstance["state"]>([
+  "completed",
+  "failed",
+  "broken",
+  "cooldown",
+  "expired",
+  "cancelled",
+  "bait_triggered",
+  "gm_voided",
+]);
+
+export function doesElementExitFlowAndTriggerRefill(instance: Pick<ElementInstance, "state">): boolean {
+  return FLOW_EXIT_STATES_TRIGGERING_REFILL.has(instance.state);
+}
+
 const RESOLUTION_SCORE_EVENTS: readonly ScoreEventType[] = [
   "mission_success",
   "constraint_success",
@@ -273,12 +288,22 @@ async function applyFinalResolutionEffects(
   await dependencies.recomputeParticipantSlots(resolvedInstance.participant_id);
   await dependencies.updateParticipantLevel(resolvedInstance.participant_id);
 
-  if (dependencies.refillVisibleReserveOfferForResolvedElement) {
-    await dependencies.refillVisibleReserveOfferForResolvedElement({
+  if (dependencies.refillVisibleReserveOfferForResolvedElement && doesElementExitFlowAndTriggerRefill(resolvedInstance)) {
+    const refillResult = await dependencies.refillVisibleReserveOfferForResolvedElement({
       participantId: resolvedInstance.participant_id,
       sessionId: resolvedInstance.session_id,
       consumedTemplateId: resolvedInstance.element_template_id,
     });
+
+    if (!refillResult.replaced) {
+      console.warn("[reserve-refill] replacement skipped", {
+        participantId: resolvedInstance.participant_id,
+        sessionId: resolvedInstance.session_id,
+        consumedTemplateId: resolvedInstance.element_template_id,
+        reason: refillResult.reason,
+        debugMessage: refillResult.debugMessage,
+      });
+    }
   }
 }
 

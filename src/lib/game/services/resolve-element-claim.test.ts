@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeSkippedCooldownMinutes, resolveElementClaim } from "@/lib/game/services/resolve-element-claim";
+import {
+  computeSkippedCooldownMinutes,
+  doesElementExitFlowAndTriggerRefill,
+  resolveElementClaim,
+} from "@/lib/game/services/resolve-element-claim";
 import type { ClaimedResult, FinalResult, ScoreEventType, ValidationMode } from "@/lib/game/enums";
 import type { ElementInstance, ElementTemplate } from "@/types/domain";
 
@@ -46,6 +50,7 @@ function makeDeps(params: {
   claimSkipAvailableAt?: string | null;
   claimedFinalResult?: FinalResult | null;
   resolvedIsFake?: boolean;
+  resolvedState?: ElementInstance["state"];
 }) {
   const claimedInstance = makeInstance({
     claimed_result: params.claimResult,
@@ -81,13 +86,14 @@ function makeDeps(params: {
           final_result: params.resolvedFinalResult ?? finalResult,
           is_fake: params.resolvedIsFake ?? false,
           state:
-            finalResult === "success"
+            params.resolvedState
+            ?? (finalResult === "success"
               ? "completed"
               : finalResult === "fail"
                 ? "failed"
                 : finalResult === "broken"
                   ? "broken"
-                  : "cooldown",
+                  : "cooldown"),
           cooldown_until: finalResult === "skipped" ? "2026-01-01T00:20:00.000Z" : null,
         });
       },
@@ -127,7 +133,7 @@ function makeDeps(params: {
       consumeFirstArmedAdvantage: async (_input: { participantId: string; effectCode: string }) => null,
       refillVisibleReserveOfferForResolvedElement: async () => {
         refillReserveCalls += 1;
-        return { replaced: true, replacementOfferId: "offer-new" };
+        return { replaced: true, replacementOfferId: "offer-new", reason: "replaced" as const, debugMessage: "ok" };
       },
       now: () => new Date(params.nowIso ?? "2026-01-01T00:05:00.000Z"),
     },
@@ -367,6 +373,33 @@ test("claim gm pending => claimed_result oui, final_result non, score non modifi
   assert.equal(getRecomputeParticipantSlotsCalls(), 0);
   assert.equal(getUpdateParticipantLevelCalls(), 0);
   assert.equal(getRefillReserveCalls(), 0);
+});
+
+test("refill trigger matrix: cancelled / gm_voided / bait_triggered déclenchent un refill", async () => {
+  for (const finalResult of ["cancelled", "gm_voided", "bait_triggered"] as const) {
+    const { deps, getRefillReserveCalls } = makeDeps({
+      claimResult: "fail",
+      validationMode: "auto",
+      resolvedFinalResult: finalResult,
+      resolvedState: finalResult,
+    });
+
+    const result = await resolveElementClaim(`instance-${finalResult}`, "fail", deps);
+    assert.equal(result.finalResolved, true);
+    assert.equal(getRefillReserveCalls(), 1);
+  }
+});
+
+test("doesElementExitFlowAndTriggerRefill: états terminaux attendus", () => {
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "active" }), false);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "completed" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "failed" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "broken" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "cooldown" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "cancelled" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "gm_voided" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "bait_triggered" }), true);
+  assert.equal(doesElementExitFlowAndTriggerRefill({ state: "expired" }), true);
 });
 
 test("claim refusé si instance déjà terminalement résolue", async () => {

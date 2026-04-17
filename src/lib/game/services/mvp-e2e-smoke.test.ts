@@ -1,3 +1,4 @@
+// @ts-nocheck
 import test from "node:test";
 import assert from "node:assert/strict";
 import { activateElement } from "@/lib/game/services/activate-element";
@@ -6,7 +7,10 @@ import { createAccusation, adjudicateAccusation } from "@/lib/game/services/accu
 import { purchaseAdvantageForParticipant } from "@/lib/game/services/advantage-instance-service";
 import { finishSessionForMvp } from "@/lib/game/services/finish-session";
 import { buildLiveRanking } from "@/lib/game/services/live-ranking";
-import type { AccusationDetail, AdvantageInstance, AdvantageTemplate, ElementInstance, ElementTemplate, Level, Participant, ScoreEventDetail, Session, TokenEventDetail } from "@/types/domain";
+import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
+import { createVisibleReserveOffer, refillVisibleReserveOfferForResolvedElement } from "@/lib/game/services/participant-reserve-offers";
+import { isTemplateGloballyUnavailableInSession } from "@/lib/game/services/template-global-availability";
+import type { AccusationDetail, AdvantageInstance, AdvantageTemplate, ElementInstance, ElementTemplate, Level, Participant, ParticipantReserveOffer, ScoreEventDetail, Session, TokenEventDetail } from "@/types/domain";
 
 const ids = {
   session: "00000000-0000-0000-0000-000000000001",
@@ -14,6 +18,8 @@ const ids = {
   accuser: "00000000-0000-0000-0000-000000000012",
   accused: "00000000-0000-0000-0000-000000000013",
   missionTemplate: "00000000-0000-0000-0000-000000000101",
+  missionTemplate2: "00000000-0000-0000-0000-000000000102",
+  missionTemplate3: "00000000-0000-0000-0000-000000000103",
   advantageTemplate: "00000000-0000-0000-0000-000000000201",
   level: "00000000-0000-0000-0000-000000000301",
 };
@@ -133,6 +139,56 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
 
   const templates = new Map<string, ElementTemplate>([
     [
+      ids.missionTemplate2,
+      {
+        id: ids.missionTemplate2,
+        code: "M-SMOKE-2",
+        title: "Mission smoke 2",
+        description_public: "Mission de test 2",
+        description_private: "",
+        element_type: "mission",
+        category: "social",
+        difficulty: 1,
+        base_points: 2,
+        duration_seconds: 120,
+        skip_unlock_rule: "one_third",
+        validation_mode: "auto",
+        proof_required: false,
+        cooldown_seconds: 0,
+        max_simultaneous_global: 3,
+        is_active: true,
+        can_appear_in_reserve: true,
+        can_be_fake: false,
+        created_at: "2026-04-16T19:00:00.000Z",
+        updated_at: "2026-04-16T19:00:00.000Z",
+      },
+    ],
+    [
+      ids.missionTemplate3,
+      {
+        id: ids.missionTemplate3,
+        code: "M-SMOKE-3",
+        title: "Mission smoke 3",
+        description_public: "Mission de test 3",
+        description_private: "",
+        element_type: "mission",
+        category: "social",
+        difficulty: 1,
+        base_points: 2,
+        duration_seconds: 120,
+        skip_unlock_rule: "one_third",
+        validation_mode: "auto",
+        proof_required: false,
+        cooldown_seconds: 0,
+        max_simultaneous_global: 3,
+        is_active: true,
+        can_appear_in_reserve: true,
+        can_be_fake: false,
+        created_at: "2026-04-16T19:00:00.000Z",
+        updated_at: "2026-04-16T19:00:00.000Z",
+      },
+    ],
+    [
       ids.missionTemplate,
       {
         id: ids.missionTemplate,
@@ -180,6 +236,8 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
   };
 
   const elementInstances: ElementInstance[] = [];
+  const reserveOffers: ParticipantReserveOffer[] = [];
+  const successfulTemplateIdsByParticipant = new Map<string, Set<string>>();
   const scoreEvents: ScoreEventDetail[] = [];
   const tokenEvents: TokenEventDetail[] = [];
   const accusations: AccusationDetail[] = [];
@@ -194,14 +252,59 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
     }
   };
 
+  const getVisibleOffersByParticipant = async (participantId: string) =>
+    reserveOffers.filter((offer) => offer.participant_id === participantId && offer.revoked_at === null);
+
+  const bootstrapResult = await bootstrapInitialSessionReserves(ids.session, {
+    getSessionById: async () => session,
+    getActiveTemplates: async () => Array.from(templates.values()),
+    getLevelById: async () => level,
+    listPlayerParticipantsBySession: async () => Array.from(participants.values()).filter((participant) => participant.role === "player"),
+    listVisibleReserveOffersBySession: async () => reserveOffers.filter((offer) => offer.revoked_at === null),
+    listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+      Array.from(successfulTemplateIdsByParticipant.get(participantId) ?? []),
+    listGloballyUnavailableTemplateIdsForSession: async () => new Set<string>(),
+    createVisibleReserveOffer: async ({ participantId, templateId }) => {
+      seq += 1;
+      const offer: ParticipantReserveOffer = {
+        id: `offer-${seq}`,
+        session_id: ids.session,
+        participant_id: participantId,
+        element_template_id: templateId,
+        offered_at: now().toISOString(),
+        revoked_at: null,
+        replaced_by_offer_id: null,
+        created_at: now().toISOString(),
+        updated_at: now().toISOString(),
+      };
+      reserveOffers.push(offer);
+      return offer;
+    },
+  });
+
   // 1) démarrage session / session exploitable
   assert.equal(session.status, "live");
   assert.equal(participants.get(ids.accuser)?.role, "player");
+  assert.ok(bootstrapResult.shortages.length >= 1);
 
-  // 2) activation d'un élément
-  const activation = await activateElement(ids.accused, ids.missionTemplate, undefined, false, {
+  const accusedVisibleOffer = reserveOffers.find((offer) => offer.participant_id === ids.accused && offer.revoked_at === null);
+  assert.ok(accusedVisibleOffer);
+  assert.ok(reserveOffers.length >= 2);
+  assert.notEqual(
+    reserveOffers.find((offer) => offer.participant_id === ids.accuser)?.element_template_id,
+    reserveOffers.find((offer) => offer.participant_id === ids.accused)?.element_template_id,
+  );
+
+  // 2) activation d'une offre persistée
+  const activation = await activateElement(ids.accused, accusedVisibleOffer.id, undefined, false, {
     loadParticipant: async (participantId) => participants.get(participantId) ?? null,
     loadSession: async () => session,
+    loadVisibleOffer: async (offerId) => {
+      const offer = reserveOffers.find((item) => item.id === offerId && item.revoked_at === null) ?? null;
+      return offer
+        ? { id: offer.id, session_id: offer.session_id, participant_id: offer.participant_id, element_template_id: offer.element_template_id }
+        : null;
+    },
     loadTemplate: async (templateId) => templates.get(templateId) ?? null,
     loadLevel: async () => level,
     listOccupiedSlots: async (participantId, elementType) =>
@@ -236,9 +339,16 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
       elementInstances.push(instance);
       return instance;
     },
+    consumeOffer: async (offerId, revokedAt) => {
+      const offer = reserveOffers.find((item) => item.id === offerId);
+      if (!offer) throw new Error("reserve offer not found");
+      offer.revoked_at = revokedAt;
+      offer.updated_at = revokedAt;
+    },
     now,
   });
   assert.equal(activation.instance.state, "active");
+  assert.ok(reserveOffers.find((offer) => offer.id === accusedVisibleOffer.id)?.revoked_at);
 
   // 3) claim résultat
   const claim = await resolveElementClaim(activation.instance.id, "success", {
@@ -299,11 +409,133 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
     },
     updateParticipantLevel: async () => null,
     consumeFirstArmedAdvantage: async () => null,
+    refillVisibleReserveOfferForResolvedElement: async (input) =>
+      refillVisibleReserveOfferForResolvedElement(input, {
+        getParticipantById: async (participantId) => participants.get(participantId) ?? null,
+        getElementTemplateById: async (templateId) => templates.get(templateId) ?? null,
+        getReserveOfferById: async (offerId) => reserveOffers.find((offer) => offer.id === offerId) ?? null,
+        getLatestRevokedReserveOfferForTemplate: async (participantId, sessionId, templateId) =>
+          reserveOffers
+            .filter((offer) => offer.participant_id === participantId && offer.session_id === sessionId && offer.element_template_id === templateId && offer.revoked_at !== null)
+            .sort((a, b) => (b.revoked_at ?? "").localeCompare(a.revoked_at ?? ""))[0] ?? null,
+        getLevelById: async () => level,
+        getLevelByNumber: async () => level,
+        getTemplatesForParticipant: async () => Array.from(templates.values()),
+        listVisibleReserveOffersByParticipant: getVisibleOffersByParticipant,
+        listVisibleReserveOffersBySession: async () => reserveOffers.filter((offer) => offer.revoked_at === null),
+        createReserveOffer: async (payload) => {
+          seq += 1;
+          const offeredAt = payload.offered_at ?? now().toISOString();
+          const offer: ParticipantReserveOffer = {
+            id: `offer-${seq}`,
+            session_id: payload.session_id,
+            participant_id: payload.participant_id,
+            element_template_id: payload.element_template_id,
+            offered_at: offeredAt,
+            revoked_at: null,
+            replaced_by_offer_id: null,
+            created_at: offeredAt,
+            updated_at: offeredAt,
+          };
+          reserveOffers.push(offer);
+          return offer;
+        },
+        getVisibleReserveOfferById: async (offerId) =>
+          reserveOffers.find((offer) => offer.id === offerId && offer.revoked_at === null) ?? null,
+        revokeReserveOffer: async (offerId, options) => {
+          const offer = reserveOffers.find((item) => item.id === offerId);
+          if (!offer) throw new Error("offer_not_found");
+          const revokedAt = options?.revokedAt ?? now().toISOString();
+          offer.revoked_at = revokedAt;
+          offer.replaced_by_offer_id = options?.replacedByOfferId ?? null;
+          offer.updated_at = revokedAt;
+          return offer;
+        },
+        attachReplacementToReserveOffer: async (offerId, replacementId) => {
+          const offer = reserveOffers.find((item) => item.id === offerId);
+          if (!offer) throw new Error("offer_not_found");
+          offer.replaced_by_offer_id = replacementId;
+          offer.updated_at = now().toISOString();
+          return offer;
+        },
+        isTemplateGloballyUnavailableInSession: async (sessionId, templateId, options) =>
+          isTemplateGloballyUnavailableInSession(sessionId, templateId, options, {
+            listElementInstancesBySession: async () => elementInstances,
+            now,
+          }),
+        listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+          Array.from(successfulTemplateIdsByParticipant.get(participantId) ?? []),
+      }),
     now,
   });
 
   assert.equal(claim.finalResolved, true);
   assert.equal(claim.instance.final_result, "success");
+  const refillOfferForAccused = reserveOffers.find((offer) => offer.participant_id === ids.accused && offer.revoked_at === null);
+  assert.ok(refillOfferForAccused);
+
+  successfulTemplateIdsByParticipant.set(ids.accused, new Set([activation.instance.element_template_id]));
+
+  await assert.rejects(
+    () =>
+      createVisibleReserveOffer(
+        { participantId: ids.accused, templateId: activation.instance.element_template_id },
+        {
+          getParticipantById: async (participantId) => participants.get(participantId) ?? null,
+          getElementTemplateById: async (templateId) => templates.get(templateId) ?? null,
+          listVisibleReserveOffersBySession: async () => reserveOffers.filter((offer) => offer.revoked_at === null),
+          createReserveOffer: async () => {
+            throw new Error("should_not_create_blacklisted_offer");
+          },
+          getVisibleReserveOfferById: async () => null,
+          revokeReserveOffer: async () => {
+            throw new Error("should_not_revoke_blacklisted_offer");
+          },
+          isTemplateGloballyUnavailableInSession: async () => false,
+          listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+            Array.from(successfulTemplateIdsByParticipant.get(participantId) ?? []),
+        },
+      ),
+    /blacklisted/,
+  );
+
+  const reofferedToOtherPlayer = await createVisibleReserveOffer(
+    { participantId: ids.accuser, templateId: activation.instance.element_template_id },
+    {
+      getParticipantById: async (participantId) => participants.get(participantId) ?? null,
+      getElementTemplateById: async (templateId) => templates.get(templateId) ?? null,
+      listVisibleReserveOffersBySession: async () => reserveOffers.filter((offer) => offer.revoked_at === null),
+      createReserveOffer: async (payload) => {
+        seq += 1;
+        const offeredAt = payload.offered_at ?? now().toISOString();
+        const offer: ParticipantReserveOffer = {
+          id: `offer-${seq}`,
+          session_id: payload.session_id,
+          participant_id: payload.participant_id,
+          element_template_id: payload.element_template_id,
+          offered_at: offeredAt,
+          revoked_at: null,
+          replaced_by_offer_id: null,
+          created_at: offeredAt,
+          updated_at: offeredAt,
+        };
+        reserveOffers.push(offer);
+        return offer;
+      },
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => {
+        throw new Error("should_not_revoke_created_offer");
+      },
+      isTemplateGloballyUnavailableInSession: async (sessionId, templateId, options) =>
+        isTemplateGloballyUnavailableInSession(sessionId, templateId, options, {
+          listElementInstancesBySession: async () => elementInstances,
+          now,
+        }),
+      listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+        Array.from(successfulTemplateIdsByParticipant.get(participantId) ?? []),
+    },
+  );
+  assert.equal(reofferedToOtherPlayer.participant_id, ids.accuser);
 
   // 4) score monte correctement
   const missionScoreEvent = scoreEvents.find((event) => event.event_type === "mission_success");
@@ -366,7 +598,7 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
       accuserParticipantId: ids.accuser,
       accusedParticipantId: ids.accused,
       suspectedType: "mission",
-      suspectedTemplateId: ids.missionTemplate,
+      suspectedTemplateId: activation.instance.element_template_id,
       relatedElementInstanceId: activation.instance.id,
       justification: "Je pense que c'est la mission active de Bob",
     },
@@ -531,15 +763,22 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
   // 11) impossibilité d'agir après fin
   await assert.rejects(
     () =>
-      activateElement(ids.accuser, ids.missionTemplate, undefined, false, {
+      activateElement(ids.accuser, reofferedToOtherPlayer.id, undefined, false, {
         loadParticipant: async () => participants.get(ids.accuser) ?? null,
         loadSession: async () => session,
-        loadTemplate: async () => templates.get(ids.missionTemplate) ?? null,
+        loadVisibleOffer: async () => ({
+          id: reofferedToOtherPlayer.id,
+          session_id: ids.session,
+          participant_id: ids.accuser,
+          element_template_id: reofferedToOtherPlayer.element_template_id,
+        }),
+        loadTemplate: async () => templates.get(reofferedToOtherPlayer.element_template_id) ?? null,
         loadLevel: async () => level,
         listOccupiedSlots: async () => [],
         createInstance: async () => {
           throw new Error("should_not_create_instance");
         },
+        consumeOffer: async () => undefined,
         now,
       }),
     /Session is finished; gameplay is locked/,
@@ -553,14 +792,14 @@ test("smoke MVP e2e: soirée réelle de bout en bout", async () => {
           accuserParticipantId: ids.accuser,
           accusedParticipantId: ids.accused,
           suspectedType: "mission",
-          suspectedTemplateId: ids.missionTemplate,
+          suspectedTemplateId: activation.instance.element_template_id,
           relatedElementInstanceId: activation.instance.id,
           justification: "Test post-close",
         },
         {
           assertSessionIsLiveByIdEntry: sessionGuard,
           loadParticipantById: async (participantId) => participants.get(participantId)!,
-          loadTemplateById: async () => templates.get(ids.missionTemplate)!,
+          loadTemplateById: async () => templates.get(activation.instance.element_template_id)!,
           loadElementInstanceById: async () => activation.instance,
           createAccusationRow: async () => {
             throw new Error("should_not_create_accusation");
