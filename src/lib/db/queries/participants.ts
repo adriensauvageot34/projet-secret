@@ -30,3 +30,19 @@ export async function getParticipantByPublicSlug(publicSlug: string): Promise<Pa
 
   return (data as Participant | null) ?? null;
 }
+
+
+export async function listPlayerParticipantsBySession(sessionId: string): Promise<Participant[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("role", "player");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as Participant[] | null) ?? [];
+}
