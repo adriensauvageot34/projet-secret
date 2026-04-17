@@ -39,7 +39,7 @@ test("session seed bootstrap: Greg and Alexis are excluded from canonical sessio
   const seed = loadFile(seedSqlPath);
 
   assert.match(seed, /when p\.display_name in \('Greg', 'Alexis'\) then false when p\.can_play = true or p\.can_be_gm = true then true else false end as include_in_session/);
-  assert.match(seed, /delete from participants existing using selected_session s join players p on p\.display_name in \('Greg', 'Alexis'\)/);
+  assert.doesNotMatch(seed, /delete from participants existing/);
   assert.match(seed, /where pfs\.include_in_session = true/);
 });
 

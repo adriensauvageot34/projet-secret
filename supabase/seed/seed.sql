@@ -6737,24 +6737,15 @@ set
   updated_at = timezone('utc', now());
 
 -- Session participants for MVP runtime.
+-- IMPORTANT (shared remote DB safety):
+-- This seed is intentionally non-destructive and must not delete existing participants.
+-- It only upserts participants from the current MVP roster via ON CONFLICT.
 with selected_session as (
   select id
   from sessions
   where name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
   limit 1
 )
-delete from participants existing
-using selected_session s
-join players p on p.display_name in ('Greg', 'Alexis')
-where existing.session_id = s.id
-  and existing.player_id = p.id;
-
-with selected_session as (
-  select id
-  from sessions
-  where name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
-  limit 1
-),
 level_one as (
   select id
   from levels
