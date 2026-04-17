@@ -361,3 +361,47 @@ test("activateElement refuse une offre déjà prise (non visible)", async () => 
     /Visible reserve offer not found/,
   );
 });
+
+test("activation depuis une offre visible runtime consomme exactement le reserveOfferId", async () => {
+  const runtimeVisibleOffer = {
+    reserveOfferId: "offer-runtime-1",
+    templateId: "template-1",
+  } as const;
+  const consumedOfferIds: string[] = [];
+  const createdTemplateIds: string[] = [];
+
+  const result = await activateElement("participant-1", runtimeVisibleOffer.reserveOfferId, undefined, false, {
+    loadParticipant: async () => ({ ...participant }),
+    loadSession: async () => ({ ...session }),
+    loadVisibleOffer: async (offerId) => (
+      offerId === runtimeVisibleOffer.reserveOfferId
+        ? {
+            id: runtimeVisibleOffer.reserveOfferId,
+            session_id: "session-1",
+            participant_id: "participant-1",
+            element_template_id: runtimeVisibleOffer.templateId,
+          }
+        : null
+    ),
+    loadTemplate: async () => ({ ...missionTemplate }),
+    loadLevel: async () => ({ ...level }),
+    listOccupiedSlots: async () => [],
+    createInstance: async (input) => {
+      createdTemplateIds.push(input.templateId);
+      return makeInstance({
+        id: "instance-runtime-1",
+        element_template_id: input.templateId,
+        active_slot_index: input.slotIndex,
+      });
+    },
+    consumeOffer: async (offerId) => {
+      consumedOfferIds.push(offerId);
+    },
+    now: () => new Date("2026-01-01T00:00:00.000Z"),
+  });
+
+  assert.equal(result.instance.id, "instance-runtime-1");
+  assert.equal(result.instance.element_template_id, runtimeVisibleOffer.templateId);
+  assert.deepEqual(createdTemplateIds, [runtimeVisibleOffer.templateId]);
+  assert.deepEqual(consumedOfferIds, [runtimeVisibleOffer.reserveOfferId]);
+});

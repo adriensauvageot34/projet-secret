@@ -38,6 +38,10 @@ type ActivateElementDeps = {
   loadParticipant: (participantId: string) => Promise<ActivationParticipant | null>;
   loadSession: (sessionId: string) => Promise<ActivationSession | null>;
   loadVisibleOffer: (offerId: string) => Promise<{ id: string; session_id: string; participant_id: string; element_template_id: string } | null>;
+  loadVisibleOfferByTemplateForParticipant?: (
+    participantId: string,
+    templateId: string,
+  ) => Promise<{ id: string; session_id: string; participant_id: string; element_template_id: string } | null>;
   loadTemplate: (templateId: string) => Promise<ActivationTemplate | null>;
   loadLevel: (levelId: string) => Promise<ActivationLevel | null>;
   listOccupiedSlots: (participantId: string, elementType: ElementTemplate["element_type"]) => Promise<OccupiedSlotRow[]>;
@@ -232,6 +236,29 @@ function createDefaultDeps(): ActivateElementDeps {
         element_template_id: offer.element_template_id,
       };
     },
+    loadVisibleOfferByTemplateForParticipant: async (participantId, templateId) => {
+      const supabase = createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("participant_reserve_offers")
+        .select("id, session_id, participant_id, element_template_id")
+        .eq("participant_id", participantId)
+        .eq("element_template_id", templateId)
+        .is("revoked_at", null)
+        .order("offered_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Failed to load visible reserve offer by template for activation: ${error.message}`);
+      }
+
+      return (data as {
+        id: string;
+        session_id: string;
+        participant_id: string;
+        element_template_id: string;
+      } | null) ?? null;
+    },
     loadLevel: async (levelId) => {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase
@@ -292,7 +319,7 @@ export async function activateElement(
     throw new Error("Participant not found");
   }
 
-  const [session, visibleOffer] = await Promise.all([
+  const [session, visibleOfferById] = await Promise.all([
     deps.loadSession(participant.session_id),
     deps.loadVisibleOffer(reserveOfferId),
   ]);
@@ -302,8 +329,13 @@ export async function activateElement(
   }
   assertSessionAllowsGameplay(session.status ?? "live");
 
+  const visibleOffer = visibleOfferById
+    ?? (deps.loadVisibleOfferByTemplateForParticipant
+      ? await deps.loadVisibleOfferByTemplateForParticipant(participant.id, reserveOfferId)
+      : null);
+
   if (!visibleOffer) {
-    throw new Error("Visible reserve offer not found");
+    throw new Error(`Visible reserve offer not found (participantId=${participant.id}, reserveOfferId=${reserveOfferId})`);
   }
 
   if (visibleOffer.participant_id !== participant.id) {

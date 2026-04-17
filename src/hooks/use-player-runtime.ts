@@ -28,7 +28,7 @@ export type PlayerActiveElement = {
 };
 
 export type PlayerReserveTemplate = {
-  offerId: string;
+  reserveOfferId: string;
   templateId: string;
   name: string;
   code: string;

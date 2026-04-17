@@ -139,7 +139,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       : await listVisibleReserveForParticipant(participant.id);
 
     const reserveTemplates = visibleReserveOffers.map((offer) => ({
-      offerId: offer.id,
+      reserveOfferId: offer.id,
       templateId: offer.template.id,
       name: offer.template.name,
       code: offer.template.code,
