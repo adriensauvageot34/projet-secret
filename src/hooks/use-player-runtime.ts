@@ -197,6 +197,20 @@ export function usePlayerRuntime(participantId: string) {
   const loadRuntimeSequenceRef = useRef(0);
   const latestAppliedSequenceRef = useRef(0);
 
+  useEffect(() => {
+    loadRuntimeSequenceRef.current = 0;
+    latestAppliedSequenceRef.current = 0;
+    setRuntime(null);
+    setError(null);
+    setActionError(null);
+    setSuccessMessage(null);
+    setPendingTemplateId(null);
+    setPendingInstanceId(null);
+    setPendingShopTemplateId(null);
+    setPendingAdvantageActionId(null);
+    setLastClaimFlowByInstanceId({});
+  }, [participantId]);
+
   const loadRuntime = useCallback(async (initial = false) => {
     const sequence = ++loadRuntimeSequenceRef.current;
 
@@ -219,7 +233,12 @@ export function usePlayerRuntime(participantId: string) {
       }
 
       latestAppliedSequenceRef.current = sequence;
-      setRuntime(sanitizeRuntimeActiveElements(payload.data));
+      const sanitized = sanitizeRuntimeActiveElements(payload.data);
+      console.info("[player-runtime] reserve offers loaded", {
+        participantId,
+        reserveOfferIds: sanitized.reserveTemplates.map((template) => template.reserveOfferId),
+      });
+      setRuntime(sanitized);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Erreur inconnue de chargement runtime joueur");
@@ -253,6 +272,12 @@ export function usePlayerRuntime(participantId: string) {
       setActionError(null);
       setSuccessMessage(null);
 
+      console.info("[player-runtime] activate reserve offer", {
+        participantId,
+        reserveOfferId,
+        visibleReserveOfferIds: runtime?.reserveTemplates.map((template) => template.reserveOfferId) ?? [],
+      });
+
       await postJson("/api/elements/activate", {
         participantId,
         reserveOfferId,
@@ -265,7 +290,7 @@ export function usePlayerRuntime(participantId: string) {
     } finally {
       setPendingTemplateId(null);
     }
-  }, [isSessionFinished, loadRuntime, participantId]);
+  }, [isSessionFinished, loadRuntime, participantId, runtime]);
 
   const claimResult = useCallback(async (instanceId: string, claimedResult: ClaimedResult) => {
     if (isSessionFinished) {
