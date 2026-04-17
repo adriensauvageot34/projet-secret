@@ -316,6 +316,8 @@ export async function resolveElementClaim(
   dependencies: ResolveElementClaimDependencies = defaultDependencies,
   options: ResolveElementClaimOptions = {},
 ): Promise<ResolveElementClaimOutput> {
+  let preloadedInstance: ElementInstance | null = null;
+
   if (dependencies.getElementInstanceById) {
     const existingInstance = await dependencies.getElementInstanceById(instanceId);
 
@@ -323,20 +325,26 @@ export async function resolveElementClaim(
       throw new Error("Element instance not found");
     }
 
+    preloadedInstance = existingInstance;
     await assertSessionIsLiveById(existingInstance.session_id);
+    assertNotAlreadyFinalized(existingInstance);
+
+    if (claimedResult === "skipped") {
+      assertSkipAvailable(existingInstance, dependencies.now());
+    }
   }
 
   const claimedInstance = await dependencies.claimResult(instanceId, claimedResult);
   assertNotAlreadyFinalized(claimedInstance);
 
+  if (!preloadedInstance && claimedResult === "skipped") {
+    assertSkipAvailable(claimedInstance, dependencies.now());
+  }
+
   const template = assertTemplate(
     await dependencies.getElementTemplateById(claimedInstance.element_template_id),
     claimedInstance.element_template_id,
   );
-
-  if (claimedResult === "skipped") {
-    assertSkipAvailable(claimedInstance, dependencies.now());
-  }
 
   const shouldAutoResolve = options.forceAutoResolve || claimedResult === "skipped" || template.validation_mode === "auto";
 
