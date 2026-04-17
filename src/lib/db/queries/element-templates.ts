@@ -111,3 +111,22 @@ export async function getElementTemplateById(templateId: string): Promise<Elemen
 
   return (data as ElementTemplate | null) ?? null;
 }
+
+
+export async function listElementTemplatesByIds(templateIds: string[]): Promise<ElementTemplate[]> {
+  if (templateIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("element_templates")
+    .select("*")
+    .in("id", templateIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ElementTemplate[];
+}
