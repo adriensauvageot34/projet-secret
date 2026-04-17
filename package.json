@@ -14,7 +14,8 @@
     "check:env": "tsx scripts/check-env.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "reset:session": "tsx scripts/reset-session-runtime.ts",
-    "links:players": "tsx scripts/list-player-links.ts"
+    "links:players": "tsx scripts/list-player-links.ts",
+    "bootstrap:reserves": "tsx scripts/bootstrap-session-reserves.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.54.0",
