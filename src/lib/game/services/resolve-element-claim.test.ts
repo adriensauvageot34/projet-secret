@@ -61,6 +61,7 @@ function makeDeps(params: {
   const resolveCalls: Array<{ finalResult: FinalResult; options?: { skippedCooldownMinutes?: number } }> = [];
   const createScoreEventCalls: Array<{ eventType: ScoreEventType; deltaPoints: number; relatedElementInstanceId: string }> = [];
   const updateComboCalls: boolean[] = [];
+  let claimResultCalls = 0;
   let recomputeParticipantSlotsCalls = 0;
   let updateParticipantLevelCalls = 0;
   let refillReserveCalls = 0;
@@ -69,11 +70,20 @@ function makeDeps(params: {
     resolveCalls,
     createScoreEventCalls,
     updateComboCalls,
+    getClaimResultCalls: () => claimResultCalls,
     getRecomputeParticipantSlotsCalls: () => recomputeParticipantSlotsCalls,
     getUpdateParticipantLevelCalls: () => updateParticipantLevelCalls,
     getRefillReserveCalls: () => refillReserveCalls,
     deps: {
-      claimResult: async () => claimedInstance,
+      getElementInstanceById: async () => makeInstance({
+        skip_available_at:
+          params.claimSkipAvailableAt === undefined ? "2026-01-01T00:03:00.000Z" : params.claimSkipAvailableAt,
+        final_result: params.claimedFinalResult ?? null,
+      }),
+      claimResult: async () => {
+        claimResultCalls += 1;
+        return claimedInstance;
+      },
       getElementTemplateById: async () =>
         makeTemplate(params.validationMode, params.durationSeconds ?? 600, {
           elementType: params.templateElementType,
@@ -324,7 +334,7 @@ test("buff armé double_next_mission_value: ajoute un bonus score égal à la va
 });
 
 test("skip trop tôt => refusé avant skip_available_at", async () => {
-  const { deps } = makeDeps({
+  const { deps, getClaimResultCalls } = makeDeps({
     claimResult: "skipped",
     validationMode: "gm",
     nowIso: "2026-01-01T00:02:00.000Z",
@@ -335,10 +345,11 @@ test("skip trop tôt => refusé avant skip_available_at", async () => {
     () => resolveElementClaim("instance-1", "skipped", deps),
     /Skip is not available yet/,
   );
+  assert.equal(getClaimResultCalls(), 0);
 });
 
 test("skip sans skip_available_at => refusé", async () => {
-  const { deps } = makeDeps({
+  const { deps, getClaimResultCalls } = makeDeps({
     claimResult: "skipped",
     validationMode: "gm",
     claimSkipAvailableAt: null,
@@ -348,6 +359,24 @@ test("skip sans skip_available_at => refusé", async () => {
     () => resolveElementClaim("instance-1", "skipped", deps),
     /Skip is not available for this element instance/,
   );
+  assert.equal(getClaimResultCalls(), 0);
+});
+
+test("skip dispo après délai => claim puis auto-résolution", async () => {
+  const { deps, getClaimResultCalls, resolveCalls } = makeDeps({
+    claimResult: "skipped",
+    validationMode: "gm",
+    nowIso: "2026-01-01T00:03:00.000Z",
+    claimSkipAvailableAt: "2026-01-01T00:03:00.000Z",
+  });
+
+  const result = await resolveElementClaim("instance-1", "skipped", deps);
+
+  assert.equal(result.flow, "auto_resolved");
+  assert.equal(result.finalResolved, true);
+  assert.equal(result.instance.final_result, "skipped");
+  assert.equal(getClaimResultCalls(), 1);
+  assert.equal(resolveCalls.length, 1);
 });
 
 test("claim proof pending => claimed_result oui, final_result non, score non modifié", async () => {
