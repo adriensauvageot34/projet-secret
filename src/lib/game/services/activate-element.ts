@@ -1,4 +1,6 @@
 import { createElementInstance, getEndsAt, getSkipAvailableAt } from "@/lib/db/mutations/element-instances";
+import { getVisibleReserveOfferById } from "@/lib/db/queries/participant-reserve-offers";
+import { revokeReserveOffer } from "@/lib/db/mutations/participant-reserve-offers";
 import { getSkipUnlockTime, getEndTime, isEligibleForReserve } from "@/lib/game/engine/template-engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assertSessionAllowsGameplay } from "@/lib/game/rules/session";
@@ -35,6 +37,7 @@ type ActivationPlan = {
 type ActivateElementDeps = {
   loadParticipant: (participantId: string) => Promise<ActivationParticipant | null>;
   loadSession: (sessionId: string) => Promise<ActivationSession | null>;
+  loadVisibleOffer: (offerId: string) => Promise<{ id: string; session_id: string; participant_id: string; element_template_id: string } | null>;
   loadTemplate: (templateId: string) => Promise<ActivationTemplate | null>;
   loadLevel: (levelId: string) => Promise<ActivationLevel | null>;
   listOccupiedSlots: (participantId: string, elementType: ElementTemplate["element_type"]) => Promise<OccupiedSlotRow[]>;
@@ -49,6 +52,7 @@ type ActivateElementDeps = {
     proofStatus: ElementInstance["proof_status"];
     isFake: boolean;
   }) => Promise<ElementInstance>;
+  consumeOffer: (offerId: string, revokedAt: string) => Promise<void>;
   now: () => Date;
 };
 
@@ -215,6 +219,19 @@ function createDefaultDeps(): ActivateElementDeps {
 
       return (data as ActivationTemplate | null) ?? null;
     },
+    loadVisibleOffer: async (offerId) => {
+      const offer = await getVisibleReserveOfferById(offerId);
+      if (!offer) {
+        return null;
+      }
+
+      return {
+        id: offer.id,
+        session_id: offer.session_id,
+        participant_id: offer.participant_id,
+        element_template_id: offer.element_template_id,
+      };
+    },
     loadLevel: async (levelId) => {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase
@@ -256,13 +273,16 @@ function createDefaultDeps(): ActivateElementDeps {
         proofStatus: input.proofStatus,
         isFake: input.isFake,
       }),
+    consumeOffer: async (offerId, revokedAt) => {
+      await revokeReserveOffer(offerId, { revokedAt });
+    },
     now: () => new Date(),
   };
 }
 
 export async function activateElement(
   participantId: string,
-  templateId: string,
+  reserveOfferId: string,
   slotIndex?: number,
   isFake = false,
   deps: ActivateElementDeps = createDefaultDeps(),
@@ -272,15 +292,29 @@ export async function activateElement(
     throw new Error("Participant not found");
   }
 
-  const [session, template] = await Promise.all([
+  const [session, visibleOffer] = await Promise.all([
     deps.loadSession(participant.session_id),
-    deps.loadTemplate(templateId),
+    deps.loadVisibleOffer(reserveOfferId),
   ]);
 
   if (!session) {
     throw new Error("Session not found for participant");
   }
   assertSessionAllowsGameplay(session.status ?? "live");
+
+  if (!visibleOffer) {
+    throw new Error("Visible reserve offer not found");
+  }
+
+  if (visibleOffer.participant_id !== participant.id) {
+    throw new Error("Reserve offer does not belong to participant");
+  }
+
+  if (visibleOffer.session_id !== session.id) {
+    throw new Error("Reserve offer does not belong to participant session");
+  }
+
+  const template = await deps.loadTemplate(visibleOffer.element_template_id);
 
   if (!template) {
     throw new Error("Element template not found");
@@ -303,7 +337,7 @@ export async function activateElement(
   const instance = await deps.createInstance({
     participantId,
     sessionId: session.id,
-    templateId,
+    templateId: template.id,
     slotIndex: plan.slotIndex,
     activatedAt: plan.activatedAt,
     endsAt: plan.endsAt,
@@ -311,6 +345,8 @@ export async function activateElement(
     proofStatus: plan.proofStatus,
     isFake,
   });
+
+  await deps.consumeOffer(visibleOffer.id, plan.activatedAt);
 
   return {
     instance,

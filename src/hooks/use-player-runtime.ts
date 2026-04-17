@@ -24,7 +24,8 @@ export type PlayerActiveElement = {
 };
 
 export type PlayerReserveTemplate = {
-  id: string;
+  offerId: string;
+  templateId: string;
   name: string;
   code: string;
   elementType: string;
@@ -219,19 +220,19 @@ export function usePlayerRuntime(participantId: string) {
 
   const isSessionFinished = runtime?.sessionStatus === "finished";
 
-  const activateElement = useCallback(async (templateId: string) => {
+  const activateElement = useCallback(async (reserveOfferId: string) => {
     if (isSessionFinished) {
       setActionError("Session terminée : actions gameplay verrouillées.");
       return;
     }
     try {
-      setPendingTemplateId(templateId);
+      setPendingTemplateId(reserveOfferId);
       setActionError(null);
       setSuccessMessage(null);
 
       await postJson("/api/elements/activate", {
         participantId,
-        templateId,
+        reserveOfferId,
       });
 
       setSuccessMessage("Élément activé.");

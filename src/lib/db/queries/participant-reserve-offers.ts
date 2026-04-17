@@ -89,3 +89,43 @@ export async function getVisibleReserveOfferById(offerId: string): Promise<Parti
 
   return (data as ParticipantReserveOffer | null) ?? null;
 }
+
+export async function getReserveOfferById(offerId: string): Promise<ParticipantReserveOffer | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participant_reserve_offers")
+    .select("*")
+    .eq("id", offerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to get reserve offer: ${error.message}`);
+  }
+
+  return (data as ParticipantReserveOffer | null) ?? null;
+}
+
+export async function getLatestRevokedReserveOfferForTemplate(
+  participantId: string,
+  sessionId: string,
+  templateId: string,
+): Promise<ParticipantReserveOffer | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participant_reserve_offers")
+    .select("*")
+    .eq("participant_id", participantId)
+    .eq("session_id", sessionId)
+    .eq("element_template_id", templateId)
+    .not("revoked_at", "is", null)
+    .is("replaced_by_offer_id", null)
+    .order("revoked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to get latest revoked reserve offer by template: ${error.message}`);
+  }
+
+  return (data as ParticipantReserveOffer | null) ?? null;
+}

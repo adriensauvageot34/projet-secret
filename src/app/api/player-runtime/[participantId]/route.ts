@@ -4,17 +4,15 @@ import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
 import {
   listElementInstancesByParticipant,
-  listSuccessfulElementTemplateIdsForParticipantInSession,
 } from "@/lib/db/queries/element-instances";
 import { getActiveTemplates, getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
-import { buildVisibleReserveTemplates } from "@/lib/game/services/reserve-templates";
 import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
 import { getSessionById } from "@/lib/db/queries/sessions";
 import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
-import { listGloballyUnavailableTemplateIdsForSession } from "@/lib/game/services/template-global-availability";
+import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
 
 async function listSessionRankingParticipants(sessionId: string): Promise<RankingParticipant[]> {
   const supabase = createServerSupabaseClient();
@@ -111,7 +109,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers, globallyUnavailableTemplateIds, successfulTemplateIds] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
@@ -121,8 +119,6 @@ export async function GET(_request: Request, context: { params: { participantId:
       getActiveTemplates(),
       listAdvantageElementTargets(participant.session_id, participant.id),
       listVisibleReserveForParticipant(participant.id),
-      listGloballyUnavailableTemplateIdsForSession(participant.session_id, { requesterParticipantId: participant.id }),
-      listSuccessfulElementTemplateIdsForParticipantInSession(participant.id, participant.session_id),
     ]);
 
     const session = await getSessionById(participant.session_id);
@@ -151,25 +147,17 @@ export async function GET(_request: Request, context: { params: { participantId:
         };
       });
 
-    const computedReserveTemplates = buildVisibleReserveTemplates(
-      templatesForLevel.filter(
-        (template) =>
-          !globallyUnavailableTemplateIds.has(template.id) &&
-          !successfulTemplateIds.includes(template.id),
-      ),
-      level,
-    ).map((template) => ({
-      id: template.id,
-      name: template.name,
-      code: template.code,
-      elementType: template.element_type,
-      difficulty: template.difficulty,
-      durationSeconds: template.duration_seconds,
-      validationMode: template.validation_mode,
-    }));
+    if (persistedVisibleReserveOffers.length === 0 && session.status === "live") {
+      await bootstrapInitialSessionReserves(session.id);
+    }
 
-    const persistedReserveTemplates = persistedVisibleReserveOffers.map((offer) => ({
-      id: offer.template.id,
+    const visibleReserveOffers = persistedVisibleReserveOffers.length > 0
+      ? persistedVisibleReserveOffers
+      : await listVisibleReserveForParticipant(participant.id);
+
+    const reserveTemplates = visibleReserveOffers.map((offer) => ({
+      offerId: offer.id,
+      templateId: offer.template.id,
       name: offer.template.name,
       code: offer.template.code,
       elementType: offer.template.element_type,
@@ -177,8 +165,6 @@ export async function GET(_request: Request, context: { params: { participantId:
       durationSeconds: offer.template.duration_seconds,
       validationMode: offer.template.validation_mode,
     }));
-
-    const reserveTemplates = persistedReserveTemplates.length > 0 ? persistedReserveTemplates : computedReserveTemplates;
 
     const shop = shopTemplates.map((template) => {
       const check = canParticipantBuyAdvantage(

@@ -5,14 +5,14 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       participantId: string;
-      templateId: string;
+      reserveOfferId: string;
       slotIndex?: number;
       isFake?: boolean;
     };
 
     const result = await activateElement(
       body.participantId,
-      body.templateId,
+      body.reserveOfferId,
       body.slotIndex,
       body.isFake ?? false,
     );

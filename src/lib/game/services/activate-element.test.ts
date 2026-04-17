@@ -119,9 +119,10 @@ test("buildActivationPlan respecte skip_unlock_rule one_half", () => {
 test("activateElement refuse quand tous les slots sont occupés", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, false, {
+      activateElement("participant-1", "offer-1", undefined, false, {
         loadParticipant: async () => ({ ...participant }),
         loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [
@@ -129,6 +130,7 @@ test("activateElement refuse quand tous les slots sont occupés", async () => {
           { active_slot_index: 1, state: "active", cooldown_until: null },
         ],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /No free slot available for activation/,
@@ -138,13 +140,15 @@ test("activateElement refuse quand tous les slots sont occupés", async () => {
 test("activateElement refuse un template inactif", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, false, {
+      activateElement("participant-1", "offer-1", undefined, false, {
         loadParticipant: async () => ({ ...participant }),
         loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate, is_active: false }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /Template is inactive/,
@@ -154,13 +158,15 @@ test("activateElement refuse un template inactif", async () => {
 test("activateElement refuse un template non éligible au niveau", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, false, {
+      activateElement("participant-1", "offer-1", undefined, false, {
         loadParticipant: async () => ({ ...participant }),
         loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate, difficulty: 3 }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /Template is not eligible for participant level/,
@@ -170,9 +176,10 @@ test("activateElement refuse un template non éligible au niveau", async () => {
 test("activateElement impose un plafond MVP de 2 slots missions", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, false, {
+      activateElement("participant-1", "offer-1", undefined, false, {
         loadParticipant: async () => ({ ...participant, mission_slot_max: 4 }),
         loadSession: async () => ({ ...session, max_active_missions: 4 }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [
@@ -180,6 +187,7 @@ test("activateElement impose un plafond MVP de 2 slots missions", async () => {
           { active_slot_index: 1, state: "active", cooldown_until: null },
         ],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /No free slot available for activation/,
@@ -189,9 +197,10 @@ test("activateElement impose un plafond MVP de 2 slots missions", async () => {
 test("activateElement refuse si les 2 slots contraintes sont occupés", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-constraint", undefined, false, {
+      activateElement("participant-1", "offer-constraint", undefined, false, {
         loadParticipant: async () => ({ ...participant, constraint_slot_max: 3 }),
         loadSession: async () => ({ ...session, max_active_constraints: 3 }),
+        loadVisibleOffer: async () => ({ id: "offer-constraint", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-constraint" }),
         loadTemplate: async () => ({ ...constraintTemplate }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [
@@ -199,6 +208,7 @@ test("activateElement refuse si les 2 slots contraintes sont occupés", async ()
           { active_slot_index: 1, state: "active", cooldown_until: null },
         ],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /No free slot available for activation/,
@@ -208,9 +218,10 @@ test("activateElement refuse si les 2 slots contraintes sont occupés", async ()
 test("activateElement bloque un slot en cooldown non expiré", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, false, {
+      activateElement("participant-1", "offer-1", undefined, false, {
         loadParticipant: async () => ({ ...participant }),
         loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate }),
         loadLevel: async () => ({ ...level }),
         listOccupiedSlots: async () => [
@@ -218,6 +229,7 @@ test("activateElement bloque un slot en cooldown non expiré", async () => {
           { active_slot_index: 1, state: "active", cooldown_until: null },
         ],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /No free slot available for activation/,
@@ -225,9 +237,10 @@ test("activateElement bloque un slot en cooldown non expiré", async () => {
 });
 
 test("activateElement autorise un slot dont le cooldown est expiré", async () => {
-  const result = await activateElement("participant-1", "template-1", undefined, false, {
+  const result = await activateElement("participant-1", "offer-1", undefined, false, {
     loadParticipant: async () => ({ ...participant }),
     loadSession: async () => ({ ...session }),
+    loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
     loadTemplate: async () => ({ ...missionTemplate }),
     loadLevel: async () => ({ ...level }),
     listOccupiedSlots: async () => [
@@ -240,6 +253,7 @@ test("activateElement autorise un slot dont le cooldown est expiré", async () =
         ends_at: input.endsAt,
         skip_available_at: input.skipAvailableAt,
       }),
+    consumeOffer: async () => undefined,
     now: () => new Date("2026-01-01T00:00:00.000Z"),
   });
 
@@ -248,9 +262,10 @@ test("activateElement autorise un slot dont le cooldown est expiré", async () =
 
 
 test("activateElement retourne un résultat UI-ready", async () => {
-  const result = await activateElement("participant-1", "template-1", undefined, false, {
+  const result = await activateElement("participant-1", "offer-1", undefined, false, {
     loadParticipant: async () => ({ ...participant }),
     loadSession: async () => ({ ...session }),
+    loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
     loadTemplate: async () => ({ ...missionTemplate }),
     loadLevel: async () => ({ ...level }),
     listOccupiedSlots: async () => [],
@@ -261,6 +276,7 @@ test("activateElement retourne un résultat UI-ready", async () => {
         ends_at: input.endsAt,
         skip_available_at: input.skipAvailableAt,
       }),
+    consumeOffer: async () => undefined,
     now: () => new Date("2026-01-01T00:00:00.000Z"),
   });
 
@@ -277,15 +293,71 @@ test("activateElement retourne un résultat UI-ready", async () => {
 test("activateElement: faux éléments bloqués avant le niveau 3", async () => {
   await assert.rejects(
     () =>
-      activateElement("participant-1", "template-1", undefined, true, {
+      activateElement("participant-1", "offer-1", undefined, true, {
         loadParticipant: async () => ({ ...participant }),
         loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-1", element_template_id: "template-1" }),
         loadTemplate: async () => ({ ...missionTemplate, can_be_fake: true }),
         loadLevel: async () => ({ ...level, level_number: 2 }),
         listOccupiedSlots: async () => [],
         createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
         now: () => new Date("2026-01-01T00:00:00.000Z"),
       }),
     /Fake elements unlock at level 3/,
+  );
+});
+
+test("activateElement refuse une offre visible d'un autre participant", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "offer-1", undefined, false, {
+        loadParticipant: async () => ({ ...participant }),
+        loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-1", participant_id: "participant-2", element_template_id: "template-1" }),
+        loadTemplate: async () => ({ ...missionTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [],
+        createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /Reserve offer does not belong to participant/,
+  );
+});
+
+test("activateElement refuse une offre visible d'une autre session", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "offer-1", undefined, false, {
+        loadParticipant: async () => ({ ...participant }),
+        loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => ({ id: "offer-1", session_id: "session-2", participant_id: "participant-1", element_template_id: "template-1" }),
+        loadTemplate: async () => ({ ...missionTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [],
+        createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /Reserve offer does not belong to participant session/,
+  );
+});
+
+test("activateElement refuse une offre déjà prise (non visible)", async () => {
+  await assert.rejects(
+    () =>
+      activateElement("participant-1", "offer-1", undefined, false, {
+        loadParticipant: async () => ({ ...participant }),
+        loadSession: async () => ({ ...session }),
+        loadVisibleOffer: async () => null,
+        loadTemplate: async () => ({ ...missionTemplate }),
+        loadLevel: async () => ({ ...level }),
+        listOccupiedSlots: async () => [],
+        createInstance: async () => makeInstance(),
+        consumeOffer: async () => undefined,
+        now: () => new Date("2026-01-01T00:00:00.000Z"),
+      }),
+    /Visible reserve offer not found/,
   );
 });

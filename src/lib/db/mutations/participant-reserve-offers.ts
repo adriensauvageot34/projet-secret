@@ -52,3 +52,19 @@ export async function revokeReserveOffer(
 
   return assertSingleRow(data as ParticipantReserveOffer | null, error, "Failed to revoke reserve offer");
 }
+
+export async function attachReplacementToReserveOffer(
+  offerId: string,
+  replacementOfferId: string,
+): Promise<ParticipantReserveOffer> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("participant_reserve_offers")
+    .update({ replaced_by_offer_id: replacementOfferId })
+    .eq("id", offerId)
+    .is("replaced_by_offer_id", null)
+    .select("*")
+    .single();
+
+  return assertSingleRow(data as ParticipantReserveOffer | null, error, "Failed to attach replacement reserve offer");
+}
