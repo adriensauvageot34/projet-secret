@@ -167,6 +167,7 @@ async function listSessionLiveElements(sessionId: string): Promise<GmRuntimeElem
       element_templates(name, element_type, validation_mode)
     `)
     .eq("session_id", sessionId)
+    .eq("state", "active")
     .order("created_at", { ascending: false })
     .limit(40);
 
