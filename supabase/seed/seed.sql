@@ -6480,6 +6480,18 @@ with selected_session as (
   from sessions
   where name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
   limit 1
+)
+delete from participants existing
+using selected_session s
+join players p on p.display_name in ('Greg', 'Alexis')
+where existing.session_id = s.id
+  and existing.player_id = p.id;
+
+with selected_session as (
+  select id
+  from sessions
+  where name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
+  limit 1
 ),
 level_one as (
   select id
@@ -6500,6 +6512,7 @@ players_for_session as (
       else 'ready'
     end as current_status,
     case
+      when p.display_name in ('Greg', 'Alexis') then false
       when p.can_play = true or p.can_be_gm = true then true
       else false
     end as include_in_session

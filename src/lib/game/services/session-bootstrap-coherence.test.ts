@@ -35,6 +35,14 @@ test("session seed bootstrap: GM participant is explicit and attached to session
   assert.match(seed, /gm_player\.display_name = 'Adrien'/);
 });
 
+test("session seed bootstrap: Greg and Alexis are excluded from canonical session participants", () => {
+  const seed = loadFile(seedSqlPath);
+
+  assert.match(seed, /when p\.display_name in \('Greg', 'Alexis'\) then false when p\.can_play = true or p\.can_be_gm = true then true else false end as include_in_session/);
+  assert.match(seed, /delete from participants existing using selected_session s join players p on p\.display_name in \('Greg', 'Alexis'\)/);
+  assert.match(seed, /where pfs\.include_in_session = true/);
+});
+
 test("schema guardrails: one GM max per session and role/status coherence", () => {
   const migration = loadFile(migrationPath);
 
