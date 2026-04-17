@@ -11,7 +11,7 @@ type GmScoreboardProps = {
 };
 
 export function GmScoreboard({ participants, sessionStatus, finalSummary }: GmScoreboardProps) {
-  const sorted = buildLiveRanking(participants);
+  const sorted = buildLiveRanking(participants.filter((participant) => participant.role !== "gm"));
 
   return (
     <Card className="space-y-3">

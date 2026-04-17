@@ -12,11 +12,19 @@ type GmSessionHeaderProps = {
 };
 
 export function GmSessionHeader({ session, isRefreshing, successMessage, actionError, isFinishing, onFinishSession }: GmSessionHeaderProps) {
+  const statusLabel = session.status === "live"
+    ? "Live"
+    : session.status === "finished"
+      ? "Terminée"
+      : session.status === "preparation"
+        ? "Préparation"
+        : "Archivée";
+
   return (
     <Card className="space-y-1 text-sm">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold">Session GM · {session.name}</h3>
-        <span className="text-xs text-slate-400">{isRefreshing ? "Sync…" : session.status === "finished" ? "Terminée" : "Live"}</span>
+        <span className="text-xs text-slate-400">{isRefreshing ? "Sync…" : statusLabel}</span>
       </div>
       <p className="text-xs text-slate-400">Statut: {session.status} · GM participant: {session.session_gm_participant_id ?? "non configuré"}</p>
       <Button
