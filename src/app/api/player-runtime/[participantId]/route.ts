@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getParticipantById } from "@/lib/db/queries/participants";
 import { getLevelById, getLevelByNumber } from "@/lib/db/queries/levels";
-import { listElementInstancesByParticipant } from "@/lib/db/queries/element-instances";
+import {
+  listElementInstancesByParticipant,
+  listSuccessfulElementTemplateIdsForParticipantInSession,
+} from "@/lib/db/queries/element-instances";
 import { getActiveTemplates, getTemplatesForParticipant } from "@/lib/db/queries/element-templates";
 import { getVisibleShopTemplatesForLevel } from "@/lib/db/queries/advantage-templates";
 import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-instances";
@@ -108,7 +111,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       return NextResponse.json({ ok: false, error: "Participant level not found" }, { status: 400 });
     }
 
-    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers, globallyUnavailableTemplateIds] = await Promise.all([
+    const [instances, templatesForLevel, inventory, shopTemplates, rankingParticipants, accusationTargets, activeTemplates, advantageElementTargets, persistedVisibleReserveOffers, globallyUnavailableTemplateIds, successfulTemplateIds] = await Promise.all([
       listElementInstancesByParticipant(participant.id),
       getTemplatesForParticipant(level.level_number),
       getParticipantAdvantageInventory(participant.id),
@@ -119,6 +122,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       listAdvantageElementTargets(participant.session_id, participant.id),
       listVisibleReserveForParticipant(participant.id),
       listGloballyUnavailableTemplateIdsForSession(participant.session_id, { requesterParticipantId: participant.id }),
+      listSuccessfulElementTemplateIdsForParticipantInSession(participant.id, participant.session_id),
     ]);
 
     const session = await getSessionById(participant.session_id);
@@ -148,7 +152,11 @@ export async function GET(_request: Request, context: { params: { participantId:
       });
 
     const computedReserveTemplates = buildVisibleReserveTemplates(
-      templatesForLevel.filter((template) => !globallyUnavailableTemplateIds.has(template.id)),
+      templatesForLevel.filter(
+        (template) =>
+          !globallyUnavailableTemplateIds.has(template.id) &&
+          !successfulTemplateIds.includes(template.id),
+      ),
       level,
     ).map((template) => ({
       id: template.id,

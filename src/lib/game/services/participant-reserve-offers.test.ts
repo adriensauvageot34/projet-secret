@@ -84,6 +84,7 @@ test("reserve offer creation: template active chez A n'est pas proposé à B", a
         getVisibleReserveOfferById: async () => null,
         revokeReserveOffer: async () => makeOffer(),
         isTemplateGloballyUnavailableInSession: async () => true,
+        listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
       },
     ),
     /element_template_globally_unavailable/,
@@ -102,6 +103,7 @@ test("reserve offer replacement: template encore bloquant chez A n'est pas propo
         createReserveOffer: async () => makeOffer({ id: "offer-new", participant_id: "participant-b" }),
         revokeReserveOffer: async () => makeOffer({ id: "offer-b", participant_id: "participant-b", revoked_at: "2026-01-01T10:01:00.000Z" }),
         isTemplateGloballyUnavailableInSession: async () => true,
+        listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
       },
     ),
     /element_template_globally_unavailable/,
@@ -125,9 +127,86 @@ test("reserve offer creation: template redevient éligible quand sorti du flux",
       getVisibleReserveOfferById: async () => null,
       revokeReserveOffer: async () => makeOffer(),
       isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
     },
   );
 
   assert.equal(created.id, "offer-created");
   assert.equal(created.participant_id, "participant-b");
+});
+
+test("reserve offer creation: succès chez A => template blacklisté chez A", async () => {
+  await assert.rejects(
+    () => createVisibleReserveOffer(
+      { participantId: "participant-a", templateId: "template-1" },
+      {
+        getParticipantById: async () => makeParticipant({ id: "participant-a", display_name: "A" }),
+        getElementTemplateById: async () => makeTemplate({ id: "template-1" }),
+        listVisibleReserveOffersBySession: async () => [],
+        createReserveOffer: async () => makeOffer(),
+        getVisibleReserveOfferById: async () => null,
+        revokeReserveOffer: async () => makeOffer(),
+        isTemplateGloballyUnavailableInSession: async () => false,
+        listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+          participantId === "participant-a" ? ["template-1"] : [],
+      },
+    ),
+    /element_template_blacklisted_for_participant_success/,
+  );
+});
+
+test("reserve offer creation: succès chez A => template toujours possible pour B", async () => {
+  const created = await createVisibleReserveOffer(
+    { participantId: "participant-b", templateId: "template-1" },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-b", display_name: "B" }),
+      getElementTemplateById: async () => makeTemplate({ id: "template-1" }),
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async (payload) => makeOffer({ id: "offer-b", participant_id: payload.participant_id }),
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer(),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async (participantId) =>
+        participantId === "participant-a" ? ["template-1"] : [],
+    },
+  );
+
+  assert.equal(created.id, "offer-b");
+  assert.equal(created.participant_id, "participant-b");
+});
+
+test("reserve offer creation: fail chez A => template peut revenir chez A", async () => {
+  const created = await createVisibleReserveOffer(
+    { participantId: "participant-a", templateId: "template-1" },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-a", display_name: "A" }),
+      getElementTemplateById: async () => makeTemplate({ id: "template-1" }),
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async (payload) => makeOffer({ id: "offer-fail", participant_id: payload.participant_id }),
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer(),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
+    },
+  );
+
+  assert.equal(created.id, "offer-fail");
+});
+
+test("reserve offer creation: skipped chez A => template peut revenir chez A", async () => {
+  const created = await createVisibleReserveOffer(
+    { participantId: "participant-a", templateId: "template-1" },
+    {
+      getParticipantById: async () => makeParticipant({ id: "participant-a", display_name: "A" }),
+      getElementTemplateById: async () => makeTemplate({ id: "template-1" }),
+      listVisibleReserveOffersBySession: async () => [],
+      createReserveOffer: async (payload) => makeOffer({ id: "offer-skipped", participant_id: payload.participant_id }),
+      getVisibleReserveOfferById: async () => null,
+      revokeReserveOffer: async () => makeOffer(),
+      isTemplateGloballyUnavailableInSession: async () => false,
+      listSuccessfulElementTemplateIdsForParticipantInSession: async () => [],
+    },
+  );
+
+  assert.equal(created.id, "offer-skipped");
 });
