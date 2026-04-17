@@ -1,5 +1,5 @@
 import { createElementInstance, getEndsAt, getSkipAvailableAt } from "@/lib/db/mutations/element-instances";
-import { getVisibleReserveOfferById } from "@/lib/db/queries/participant-reserve-offers";
+import { getVisibleReserveOfferByIdForParticipantSession } from "@/lib/db/queries/participant-reserve-offers";
 import { revokeReserveOffer } from "@/lib/db/mutations/participant-reserve-offers";
 import { getSkipUnlockTime, getEndTime, isEligibleForReserve } from "@/lib/game/engine/template-engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -37,7 +37,11 @@ type ActivationPlan = {
 type ActivateElementDeps = {
   loadParticipant: (participantId: string) => Promise<ActivationParticipant | null>;
   loadSession: (sessionId: string) => Promise<ActivationSession | null>;
-  loadVisibleOffer: (offerId: string) => Promise<{ id: string; session_id: string; participant_id: string; element_template_id: string } | null>;
+  loadVisibleOffer: (
+    offerId: string,
+    participantId: string,
+    sessionId: string,
+  ) => Promise<{ id: string; session_id: string; participant_id: string; element_template_id: string } | null>;
   loadTemplate: (templateId: string) => Promise<ActivationTemplate | null>;
   loadLevel: (levelId: string) => Promise<ActivationLevel | null>;
   listOccupiedSlots: (participantId: string, elementType: ElementTemplate["element_type"]) => Promise<OccupiedSlotRow[]>;
@@ -219,8 +223,8 @@ function createDefaultDeps(): ActivateElementDeps {
 
       return (data as ActivationTemplate | null) ?? null;
     },
-    loadVisibleOffer: async (offerId) => {
-      const offer = await getVisibleReserveOfferById(offerId);
+    loadVisibleOffer: async (offerId, participantId, sessionId) => {
+      const offer = await getVisibleReserveOfferByIdForParticipantSession(offerId, participantId, sessionId);
       if (!offer) {
         return null;
       }
@@ -294,7 +298,7 @@ export async function activateElement(
 
   const [session, visibleOfferById] = await Promise.all([
     deps.loadSession(participant.session_id),
-    deps.loadVisibleOffer(reserveOfferId),
+    deps.loadVisibleOffer(reserveOfferId, participant.id, participant.session_id),
   ]);
 
   if (!session) {
@@ -309,15 +313,15 @@ export async function activateElement(
       participantId: participant.id,
       reserveOfferId,
       sessionId: participant.session_id,
+      dbLookup: null,
     });
     throw new Error(`Visible reserve offer not found (participantId=${participant.id}, reserveOfferId=${reserveOfferId})`);
   }
 
-  console.info("[activate-element] consuming visible offer", {
+  console.info("[activate-element] visible offer lookup result", {
     participantId: participant.id,
-    reserveOfferId: visibleOffer.id,
-    templateId: visibleOffer.element_template_id,
-    sessionId: visibleOffer.session_id,
+    reserveOfferId,
+    dbLookup: visibleOffer,
   });
 
   if (visibleOffer.participant_id !== participant.id) {

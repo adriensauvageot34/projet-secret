@@ -405,3 +405,54 @@ test("activation depuis une offre visible runtime consomme exactement le reserve
   assert.deepEqual(createdTemplateIds, [runtimeVisibleOffer.templateId]);
   assert.deepEqual(consumedOfferIds, [runtimeVisibleOffer.reserveOfferId]);
 });
+
+test("un reserveOfferId issu du runtime est activable immédiatement dans le même scope participant/session", async () => {
+  const runtimeReserveOffers = [
+    {
+      id: "offer-live-1",
+      session_id: "session-1",
+      participant_id: "participant-1",
+      element_template_id: "template-1",
+    },
+    {
+      id: "offer-old-session",
+      session_id: "session-legacy",
+      participant_id: "participant-1",
+      element_template_id: "template-1",
+    },
+  ] as const;
+
+  const lookupCalls: Array<{ offerId: string; participantId: string; sessionId: string }> = [];
+
+  const result = await activateElement("participant-1", runtimeReserveOffers[0].id, undefined, false, {
+    loadParticipant: async () => ({ ...participant }),
+    loadSession: async () => ({ ...session }),
+    loadVisibleOffer: async (offerId, participantId, sessionId) => {
+      lookupCalls.push({ offerId, participantId, sessionId });
+      return runtimeReserveOffers.find((offer) =>
+        offer.id === offerId
+        && offer.participant_id === participantId
+        && offer.session_id === sessionId) ?? null;
+    },
+    loadTemplate: async () => ({ ...missionTemplate }),
+    loadLevel: async () => ({ ...level }),
+    listOccupiedSlots: async () => [],
+    createInstance: async (input) =>
+      makeInstance({
+        id: "instance-scoped-lookup",
+        element_template_id: input.templateId,
+        active_slot_index: input.slotIndex,
+      }),
+    consumeOffer: async () => undefined,
+    now: () => new Date("2026-01-01T00:00:00.000Z"),
+  });
+
+  assert.equal(result.instance.id, "instance-scoped-lookup");
+  assert.deepEqual(lookupCalls, [
+    {
+      offerId: "offer-live-1",
+      participantId: "participant-1",
+      sessionId: "session-1",
+    },
+  ]);
+});
