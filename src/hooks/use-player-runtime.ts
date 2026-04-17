@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiResponse } from "@/types/api";
 import type {
-  Accusation,
   AdvantageInstanceWithTemplate,
   AdvantageTemplate,
   ElementInstance,
@@ -45,15 +44,9 @@ export type PlayerShopItem = {
   reasons: string[];
 };
 
-export type PlayerAccusationTarget = {
+export type PlayerParticipantTarget = {
   id: string;
   displayName: string;
-};
-
-export type PlayerAccusableTemplate = {
-  id: string;
-  name: string;
-  elementType: "mission" | "constraint";
 };
 
 export type PlayerAdvantageElementTarget = {
@@ -85,9 +78,12 @@ export type PlayerRuntimeData = {
     above: LiveRankingEntry | null;
     below: LiveRankingEntry | null;
   };
-  accusationTargets: PlayerAccusationTarget[];
-  accusableTemplates: PlayerAccusableTemplate[];
+  participantTargets: PlayerParticipantTarget[];
   advantageElementTargets: PlayerAdvantageElementTarget[];
+  caughtNotification: {
+    message: string;
+    adjudicatedAt: string | null;
+  } | null;
 };
 
 type ActivateElementResponse = {
@@ -143,22 +139,6 @@ function parseActionError(message: string): string {
     return "La cible ne correspond pas au participant sélectionné.";
   }
 
-  if (message.includes("accuser_participant_id must be different")) {
-    return "Vous ne pouvez pas vous auto-accuser.";
-  }
-
-  if (message.includes("must target an element_templates row")) {
-    return "Le template choisi ne correspond pas au type d'accusation.";
-  }
-
-  if (message.includes("accused_participant_id must reference a player participant")) {
-    return "La cible n'est pas accusable (participant GM).";
-  }
-
-  if (message.includes("justification")) {
-    return "Justification invalide. Merci de saisir un texte clair avant envoi.";
-  }
-
   if (message.includes("already terminally resolved")) {
     return "Cet élément est déjà résolu. Rafraîchissez la page pour synchroniser l'état.";
   }
@@ -197,7 +177,6 @@ export function usePlayerRuntime(participantId: string) {
   const [pendingInstanceId, setPendingInstanceId] = useState<string | null>(null);
   const [pendingShopTemplateId, setPendingShopTemplateId] = useState<string | null>(null);
   const [pendingAdvantageActionId, setPendingAdvantageActionId] = useState<string | null>(null);
-  const [isCreatingAccusation, setIsCreatingAccusation] = useState(false);
   const [lastClaimFlowByInstanceId, setLastClaimFlowByInstanceId] = useState<Record<string, string>>({});
   const loadRuntimeSequenceRef = useRef(0);
   const latestAppliedSequenceRef = useRef(0);
@@ -378,44 +357,6 @@ export function usePlayerRuntime(participantId: string) {
     }
   }, [isSessionFinished, loadRuntime, participantId]);
 
-  const createAccusation = useCallback(async (params: {
-    accusedParticipantId: string;
-    suspectedType: "mission" | "constraint";
-    suspectedTemplateId: string;
-    justification: string;
-  }): Promise<Accusation> => {
-    if (isSessionFinished) {
-      const message = "Session terminée : actions gameplay verrouillées.";
-      setActionError(message);
-      throw new Error(message);
-    }
-    try {
-      setIsCreatingAccusation(true);
-      setActionError(null);
-      setSuccessMessage(null);
-
-      const accusation = await postJson<Accusation>("/api/accusations/create", {
-        sessionId: runtime?.participant.session_id ?? "",
-        accuserParticipantId: participantId,
-        accusedParticipantId: params.accusedParticipantId,
-        suspectedType: params.suspectedType,
-        suspectedTemplateId: params.suspectedTemplateId,
-        justification: params.justification,
-      });
-
-      setSuccessMessage("Accusation envoyée au GM.");
-      await loadRuntime(false);
-
-      return accusation;
-    } catch (cause) {
-      const readableError = cause instanceof Error ? cause.message : "Accusation impossible";
-      setActionError(readableError);
-      throw new Error(readableError);
-    } finally {
-      setIsCreatingAccusation(false);
-    }
-  }, [isSessionFinished, loadRuntime, participantId, runtime?.participant.session_id]);
-
   const activateAdvantage = useCallback(async (params: {
     advantageInstanceId: string;
     targetParticipantId?: string | null;
@@ -488,13 +429,11 @@ export function usePlayerRuntime(participantId: string) {
     pendingInstanceId,
     pendingShopTemplateId,
     pendingAdvantageActionId,
-    isCreatingAccusation,
     lastClaimFlowByInstanceId,
     refresh: () => loadRuntime(false),
     activateElement,
     claimResult,
     buyAdvantage,
-    createAccusation,
     activateAdvantage,
     useAdvantage,
   }), [
@@ -503,9 +442,7 @@ export function usePlayerRuntime(participantId: string) {
     actionError,
     buyAdvantage,
     claimResult,
-    createAccusation,
     error,
-    isCreatingAccusation,
     isLoading,
     isRefreshing,
     lastClaimFlowByInstanceId,

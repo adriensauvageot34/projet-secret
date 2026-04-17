@@ -10,6 +10,7 @@ import { getAccusationById, type AccusationDetail } from "@/lib/db/queries/accus
 import { hasAccusationCorrectRewardTokenEvent } from "@/lib/game/services/token-events";
 import { consumeFirstArmedAdvantage } from "@/lib/game/services/armed-advantages";
 import { assertSessionIsLiveById } from "@/lib/game/rules/session";
+import { resolveElementClaim } from "@/lib/game/services/resolve-element-claim";
 
 const suspectedTypeSchema = z.enum(["mission", "constraint"]);
 const accusationStatusSchema = z.enum(["submitted", "under_review", "validated", "rejected", "cancelled"]);
@@ -289,6 +290,7 @@ type AdjudicateAccusationDeps = {
   createArbitrationDecision: typeof createArbitrationDecisionRecord;
   hasAccusationCorrectRewardTokenEventEntry: typeof hasAccusationCorrectRewardTokenEvent;
   consumeFirstArmedAdvantageEntry: typeof consumeFirstArmedAdvantage;
+  resolveElementClaimEntry: typeof resolveElementClaim;
 };
 
 const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
@@ -301,6 +303,7 @@ const defaultAdjudicateAccusationDeps: AdjudicateAccusationDeps = {
   createArbitrationDecision: createArbitrationDecisionRecord,
   hasAccusationCorrectRewardTokenEventEntry: hasAccusationCorrectRewardTokenEvent,
   consumeFirstArmedAdvantageEntry: consumeFirstArmedAdvantage,
+  resolveElementClaimEntry: resolveElementClaim,
 };
 
 export async function createAccusation(input: CreateAccusationInput, deps: Partial<CreateAccusationDeps> = {}): Promise<AccusationDetail> {
@@ -463,6 +466,13 @@ export async function adjudicateAccusation(
   }
 
   if (payload.decision === "correct") {
+    if (accusation.related_element_instance_id) {
+      const forcedClaim = accusation.suspected_type === "constraint" ? "broken" : "fail";
+      await resolvedDeps.resolveElementClaimEntry(accusation.related_element_instance_id, forcedClaim, undefined, {
+        forceAutoResolve: true,
+      });
+    }
+
     const consumedAccusationBonus = await resolvedDeps.consumeFirstArmedAdvantageEntry({
       participantId: accusation.accuser_participant_id,
       effectCode: "next_correct_accusation_bonus_3",

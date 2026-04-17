@@ -678,3 +678,93 @@ test("fake bait: rejeté si l'accusation n'est pas liée à un faux élément", 
     ),
   );
 });
+
+test("accusation GM correcte sur mission => fail auto", async () => {
+  const forcedClaims: string[] = [];
+  let updated = false;
+  const finalDetail = makeAccusation({
+    status: "validated",
+    decision: "correct",
+    verdict: "juste",
+    is_receivable: true,
+    related_element_instance_id: "00000000-0000-0000-0000-000000000101",
+    suspected_type: "mission",
+  });
+
+  await adjudicateAccusation(
+    {
+      accusationId: ACCUSATION_ID,
+      sessionId: SESSION_ID,
+      adjudicatedByParticipantId: GM_ID,
+      decision: "correct",
+      rewardTokens: 0,
+    },
+    {
+      getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation({
+        related_element_instance_id: "00000000-0000-0000-0000-000000000101",
+        suspected_type: "mission",
+      })),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+      updateAccusationRow: async () => {
+        updated = true;
+        return finalDetail;
+      },
+      createTokenEventEntry: async () => ({ id: "evt" } as never),
+      createScoreEventEntry: async () => ({ id: "score" } as never),
+      createArbitrationDecision: async () => undefined,
+      hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
+      resolveElementClaimEntry: async (instanceId, claimedResult) => {
+        forcedClaims.push(`${instanceId}:${claimedResult}`);
+        return {} as never;
+      },
+    },
+  );
+
+  assert.deepEqual(forcedClaims, ["00000000-0000-0000-0000-000000000101:fail"]);
+});
+
+test("accusation GM correcte sur contrainte => broken auto", async () => {
+  const forcedClaims: string[] = [];
+  let updated = false;
+  const finalDetail = makeAccusation({
+    status: "validated",
+    decision: "correct",
+    verdict: "juste",
+    is_receivable: true,
+    related_element_instance_id: "00000000-0000-0000-0000-000000000102",
+    suspected_type: "constraint",
+  });
+
+  await adjudicateAccusation(
+    {
+      accusationId: ACCUSATION_ID,
+      sessionId: SESSION_ID,
+      adjudicatedByParticipantId: GM_ID,
+      decision: "correct",
+      rewardTokens: 0,
+    },
+    {
+      getAccusationDetailById: async () => (updated ? finalDetail : makeAccusation({
+        related_element_instance_id: "00000000-0000-0000-0000-000000000102",
+        suspected_type: "constraint",
+      })),
+      loadParticipantById: async () => makeParticipant(GM_ID, { role: "gm", current_status: "gm" }),
+      updateAccusationRow: async () => {
+        updated = true;
+        return finalDetail;
+      },
+      createTokenEventEntry: async () => ({ id: "evt" } as never),
+      createScoreEventEntry: async () => ({ id: "score" } as never),
+      createArbitrationDecision: async () => undefined,
+      hasAccusationCorrectRewardTokenEventEntry: async () => false,
+      consumeFirstArmedAdvantageEntry: async () => null,
+      resolveElementClaimEntry: async (instanceId, claimedResult) => {
+        forcedClaims.push(`${instanceId}:${claimedResult}`);
+        return {} as never;
+      },
+    },
+  );
+
+  assert.deepEqual(forcedClaims, ["00000000-0000-0000-0000-000000000102:broken"]);
+});
