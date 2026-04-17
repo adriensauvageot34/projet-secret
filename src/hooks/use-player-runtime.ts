@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiResponse } from "@/types/api";
 import type {
   Accusation,
@@ -11,6 +11,10 @@ import type {
 } from "@/types/domain";
 import type { ClaimedResult } from "@/lib/game/enums";
 import type { LiveRankingEntry } from "@/lib/game/services/live-ranking";
+import {
+  applyClaimRuntimeOptimisticUpdate,
+  sanitizeRuntimeActiveElements,
+} from "@/lib/game/services/player-runtime-client-state";
 
 export type PlayerActiveElement = {
   instance: ElementInstance;
@@ -150,6 +154,14 @@ function parseActionError(message: string): string {
     return "Justification invalide. Merci de saisir un texte clair avant envoi.";
   }
 
+  if (message.includes("already terminally resolved")) {
+    return "Cet élément est déjà résolu. Rafraîchissez la page pour synchroniser l'état.";
+  }
+
+  if (message.includes("already claimed and pending resolution")) {
+    return "Ce claim a déjà été envoyé. En attente de résolution.";
+  }
+
   return message;
 }
 
@@ -182,8 +194,12 @@ export function usePlayerRuntime(participantId: string) {
   const [pendingAdvantageActionId, setPendingAdvantageActionId] = useState<string | null>(null);
   const [isCreatingAccusation, setIsCreatingAccusation] = useState(false);
   const [lastClaimFlowByInstanceId, setLastClaimFlowByInstanceId] = useState<Record<string, string>>({});
+  const loadRuntimeSequenceRef = useRef(0);
+  const latestAppliedSequenceRef = useRef(0);
 
   const loadRuntime = useCallback(async (initial = false) => {
+    const sequence = ++loadRuntimeSequenceRef.current;
+
     try {
       if (initial) {
         setIsLoading(true);
@@ -198,13 +214,20 @@ export function usePlayerRuntime(participantId: string) {
         throw new Error(payload.ok ? "Impossible de charger le runtime joueur" : payload.error);
       }
 
-      setRuntime(payload.data);
+      if (sequence < latestAppliedSequenceRef.current) {
+        return;
+      }
+
+      latestAppliedSequenceRef.current = sequence;
+      setRuntime(sanitizeRuntimeActiveElements(payload.data));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Erreur inconnue de chargement runtime joueur");
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (sequence === loadRuntimeSequenceRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [participantId]);
 
@@ -259,6 +282,11 @@ export function usePlayerRuntime(participantId: string) {
         claimedResult,
       });
 
+      setRuntime((current) => applyClaimRuntimeOptimisticUpdate(current, {
+        instanceId,
+        claimedResult,
+        finalResolved: result.finalResolved,
+      }));
       setLastClaimFlowByInstanceId((current) => ({ ...current, [instanceId]: result.flow }));
 
       if (result.finalResolved) {
