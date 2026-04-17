@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatDate } from "@/utils/formatting";
 import type { PlayerActiveElement } from "@/hooks/use-player-runtime";
+import { canClaimRuntimeElement } from "@/lib/game/services/player-runtime-client-state";
 
 const CLAIMS: ClaimedResult[] = ["success", "fail", "broken", "skipped"];
 
@@ -29,6 +30,7 @@ export function ActiveElementsPanel({
         <div className="space-y-3">
           {activeElements.map(({ instance, template }) => {
             const flow = lastClaimFlowByInstanceId[instance.id];
+            const canClaim = canClaimRuntimeElement(instance, pendingInstanceId);
 
             return (
               <div key={instance.id} className="rounded border border-slate-700 p-2 text-xs text-slate-300">
@@ -44,10 +46,10 @@ export function ActiveElementsPanel({
                     <Button
                       key={claim}
                       className="w-full"
-                      disabled={pendingInstanceId === instance.id}
+                      disabled={!canClaim}
                       onClick={() => void onClaim(instance.id, claim)}
                     >
-                      {pendingInstanceId === instance.id ? "Envoi..." : `Claim ${claim}`}
+                      {!canClaim && pendingInstanceId === instance.id ? "Envoi..." : `Claim ${claim}`}
                     </Button>
                   ))}
                 </div>

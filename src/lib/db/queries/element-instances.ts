@@ -39,6 +39,7 @@ export async function listActiveElementInstancesByParticipant(
     .eq("participant_id", participantId)
     .eq("session_id", sessionId)
     .eq("state", "active")
+    .is("final_result", null)
     .order("activated_at", { ascending: false })
     .order("created_at", { ascending: false });
 

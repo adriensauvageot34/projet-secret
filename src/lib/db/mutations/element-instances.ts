@@ -72,14 +72,41 @@ export async function claimResult(instanceId: string, claimedResult: ClaimedResu
     .update({ claimed_result: claimedResult })
     .eq("id", instanceId)
     .is("final_result", null)
+    .is("claimed_result", null)
     .select("*")
-    .single();
+    .maybeSingle();
 
-  return assertSingleRow(
-    data as ElementInstance | null,
-    error,
-    "Failed to claim element result (already terminally resolved or not found)",
-  );
+  if (error) {
+    throw new Error(`Failed to claim element result: ${error.message}`);
+  }
+
+  if (data) {
+    return data as ElementInstance;
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("element_instances")
+    .select("id, final_result, claimed_result")
+    .eq("id", instanceId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Failed to inspect existing element claim status: ${existingError.message}`);
+  }
+
+  if (!existing) {
+    throw new Error("Failed to claim element result (instance not found)");
+  }
+
+  if (existing.final_result !== null) {
+    throw new Error("Element instance is already terminally resolved");
+  }
+
+  if (existing.claimed_result !== null) {
+    throw new Error("Element result already claimed and pending resolution");
+  }
+
+  throw new Error("Failed to claim element result (unknown state)");
 }
 
 export async function submitProof(instanceId: string): Promise<ElementInstance> {
