@@ -9,7 +9,7 @@ import { useCountdown } from "@/hooks/use-countdown";
 import type { ElementInstance } from "@/types/domain";
 
 const MISSION_CLAIMS: ClaimedResult[] = ["success", "fail", "skipped"];
-const CONSTRAINT_CLAIMS: ClaimedResult[] = ["fail", "broken", "skipped"];
+const CONSTRAINT_CLAIMS: ClaimedResult[] = ["broken", "skipped"];
 
 type ActiveElementsPanelProps = {
   activeElements: PlayerActiveElement[];
@@ -93,12 +93,14 @@ function SkipAvailabilityHint({ skipAvailableAt }: { skipAvailableAt: string | n
 
 function ClaimButton({
   claim,
+  elementType,
   instance,
   canClaim,
   pendingInstanceId,
   onClaim,
 }: {
   claim: ClaimedResult;
+  elementType: string | null | undefined;
   instance: ElementInstance;
   canClaim: boolean;
   pendingInstanceId: string | null;
@@ -113,7 +115,7 @@ function ClaimButton({
   const isSkipLocked = claim === "skipped" && !skipAvailability.canSkipNow;
   const disabled = !canClaim || isSkipLocked;
 
-  let label = `Claim ${claim}`;
+  let label = getClaimButtonLabel(claim, elementType);
   if (!canClaim && pendingInstanceId === instance.id) {
     label = "Envoi...";
   } else if (claim === "skipped" && isSkipLocked) {
@@ -125,6 +127,26 @@ function ClaimButton({
       {label}
     </Button>
   );
+}
+
+export function getClaimButtonLabel(claim: ClaimedResult, elementType: string | null | undefined): string {
+  if (claim === "broken" && elementType === "constraint") {
+    return "Contrainte rompue";
+  }
+
+  if (claim === "success") {
+    return "Succès";
+  }
+
+  if (claim === "fail") {
+    return "Échec";
+  }
+
+  if (claim === "skipped") {
+    return "Passer";
+  }
+
+  return `Claim ${claim}`;
 }
 
 export function ActiveElementsPanel({
@@ -143,7 +165,8 @@ export function ActiveElementsPanel({
           {activeElements.map(({ instance, template }) => {
             const flow = lastClaimFlowByInstanceId[instance.id];
             const canClaim = canClaimRuntimeElement(instance, pendingInstanceId);
-            const claims = getClaimButtonsForElement(template?.elementType);
+            const elementType = template?.elementType;
+            const claims = getClaimButtonsForElement(elementType);
 
             return (
               <div key={instance.id} className="rounded border border-slate-700 p-2 text-xs text-slate-300">
@@ -166,6 +189,7 @@ export function ActiveElementsPanel({
                     <ClaimButton
                       key={claim}
                       claim={claim}
+                      elementType={elementType}
                       instance={instance}
                       canClaim={canClaim}
                       pendingInstanceId={pendingInstanceId}

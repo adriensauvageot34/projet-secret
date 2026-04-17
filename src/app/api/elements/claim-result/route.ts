@@ -35,6 +35,10 @@ export async function POST(request: Request) {
       throw new Error("Constraint elements cannot be manually claimed as success");
     }
 
+    if (template.element_type === "constraint" && body.claimedResult === "fail") {
+      throw new Error("Constraint elements must be claimed as broken (or skipped), not fail");
+    }
+
     const result = await resolveElementClaim(body.instanceId, body.claimedResult);
     return NextResponse.json({ ok: true, data: result });
   } catch (error) {

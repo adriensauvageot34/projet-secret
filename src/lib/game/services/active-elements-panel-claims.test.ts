@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   formatMmSs,
+  getClaimButtonLabel,
   getClaimButtonsForElement,
   getSkipAvailability,
   getSkipRemainingSeconds,
@@ -11,8 +12,12 @@ test("UI mission affiche Success + Fail + Skip", () => {
   assert.deepEqual(getClaimButtonsForElement("mission"), ["success", "fail", "skipped"]);
 });
 
-test("UI contrainte affiche seulement Fail/Broken + Skip", () => {
-  assert.deepEqual(getClaimButtonsForElement("constraint"), ["fail", "broken", "skipped"]);
+test("UI contrainte masque fail et garde broken + skip", () => {
+  assert.deepEqual(getClaimButtonsForElement("constraint"), ["broken", "skipped"]);
+});
+
+test("UI libellé broken sur contrainte est métier", () => {
+  assert.equal(getClaimButtonLabel("broken", "constraint"), "Contrainte rompue");
 });
 
 test("skip countdown: format MM:SS", () => {
