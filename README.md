@@ -58,6 +58,22 @@ supabase db push
 supabase db seed --file supabase/seed/seed.sql
 ```
 
+## Protection MVP de la console GM (avant exposition publique)
+
+Configurer un secret d'accès GM (cookie HTTP-only posé par middleware) :
+
+```bash
+export GM_ACCESS_TOKEN=...
+```
+
+Puis ouvrir la console GM une première fois avec ce token :
+
+```text
+/gm?gm_access=VOTRE_TOKEN
+```
+
+Ensuite les routes GM/admin sensibles restent protégées (`/gm`, `/api/gm-runtime`, `/api/gm-decisions*`, `/api/sessions/finish`, `/api/accusations/adjudicate`, `/api/token-events*`, `/api/score-events*`).
+
 ## Structure du projet
 
 - `src/app`: pages, layouts, API routes
