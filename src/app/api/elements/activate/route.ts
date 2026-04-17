@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { activateElement } from "@/lib/game/services/activate-element";
+import { getVisibleReserveOfferById } from "@/lib/db/queries/participant-reserve-offers";
 
 export async function POST(request: Request) {
   let participantId = "";
@@ -25,6 +26,13 @@ export async function POST(request: Request) {
       reserveOfferId,
       hasLegacyOfferId: typeof body.offerId === "string" && body.offerId.length > 0,
       hasLegacyTemplateId: typeof body.templateId === "string" && body.templateId.length > 0,
+    });
+
+    const preActivationLookup = await getVisibleReserveOfferById(reserveOfferId);
+    console.info("[elements.activate] visible offer lookup by reserveOfferId", {
+      participantId,
+      reserveOfferId,
+      dbLookup: preActivationLookup,
     });
 
     const result = await activateElement(

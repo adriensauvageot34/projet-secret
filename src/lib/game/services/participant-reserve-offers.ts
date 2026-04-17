@@ -3,6 +3,7 @@ import {
   getLatestRevokedReserveOfferForTemplate,
   getReserveOfferById,
   getVisibleReserveOfferById,
+  listVisibleReserveOffersByParticipantInSession,
   listVisibleReserveOffersByParticipant,
   listVisibleReserveOffersBySession,
 } from "@/lib/db/queries/participant-reserve-offers";
@@ -36,6 +37,7 @@ type ParticipantReserveOfferDependencies = {
   getLevelByNumber: typeof getLevelByNumber;
   getTemplatesForParticipant: typeof getTemplatesForParticipant;
   listVisibleReserveOffersByParticipant: typeof listVisibleReserveOffersByParticipant;
+  listVisibleReserveOffersByParticipantInSession: typeof listVisibleReserveOffersByParticipantInSession;
   listVisibleReserveOffersBySession: typeof listVisibleReserveOffersBySession;
   createReserveOffer: typeof createReserveOffer;
   getVisibleReserveOfferById: typeof getVisibleReserveOfferById;
@@ -54,6 +56,7 @@ const defaultDependencies: ParticipantReserveOfferDependencies = {
   getLevelByNumber,
   getTemplatesForParticipant,
   listVisibleReserveOffersByParticipant,
+  listVisibleReserveOffersByParticipantInSession,
   listVisibleReserveOffersBySession,
   createReserveOffer,
   getVisibleReserveOfferById,
@@ -63,7 +66,14 @@ const defaultDependencies: ParticipantReserveOfferDependencies = {
   listSuccessfulElementTemplateIdsForParticipantInSession,
 };
 
-export async function listVisibleReserveForParticipant(participantId: string): Promise<ParticipantReserveOfferWithTemplate[]> {
+export async function listVisibleReserveForParticipant(
+  participantId: string,
+  sessionId?: string,
+): Promise<ParticipantReserveOfferWithTemplate[]> {
+  if (sessionId) {
+    return listVisibleReserveOffersByParticipantInSession(participantId, sessionId);
+  }
+
   return listVisibleReserveOffersByParticipant(participantId);
 }
 

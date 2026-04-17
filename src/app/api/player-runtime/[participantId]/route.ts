@@ -117,7 +117,7 @@ export async function GET(_request: Request, context: { params: { participantId:
       listAccusationTargets(participant.session_id, participant.id),
       getActiveTemplates(),
       listAdvantageElementTargets(participant.session_id, participant.id),
-      listVisibleReserveForParticipant(participant.id),
+      listVisibleReserveForParticipant(participant.id, participant.session_id),
     ]);
 
     const session = await getSessionById(participant.session_id);
@@ -136,7 +136,7 @@ export async function GET(_request: Request, context: { params: { participantId:
 
     const visibleReserveOffers = persistedVisibleReserveOffers.length > 0
       ? persistedVisibleReserveOffers
-      : await listVisibleReserveForParticipant(participant.id);
+      : await listVisibleReserveForParticipant(participant.id, participant.session_id);
 
     const reserveTemplates = visibleReserveOffers.map((offer) => ({
       reserveOfferId: offer.id,
@@ -151,6 +151,8 @@ export async function GET(_request: Request, context: { params: { participantId:
 
     console.info("[player-runtime] reserve offers response", {
       participantId: participant.id,
+      sessionId: participant.session_id,
+      reserveOfferCount: reserveTemplates.length,
       reserveOfferIds: reserveTemplates.map((offer) => offer.reserveOfferId),
       reserveTemplateIds: reserveTemplates.map((offer) => offer.templateId),
     });
