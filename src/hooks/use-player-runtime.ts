@@ -12,6 +12,7 @@ import type {
 import type { ClaimedResult } from "@/lib/game/enums";
 import type { LiveRankingEntry } from "@/lib/game/services/live-ranking";
 import {
+  applyActivationRuntimeOptimisticUpdate,
   applyServerRuntimeSnapshot,
   applyClaimRuntimeOptimisticUpdate,
 } from "@/lib/game/services/player-runtime-client-state";
@@ -87,6 +88,10 @@ export type PlayerRuntimeData = {
   accusationTargets: PlayerAccusationTarget[];
   accusableTemplates: PlayerAccusableTemplate[];
   advantageElementTargets: PlayerAdvantageElementTarget[];
+};
+
+type ActivateElementResponse = {
+  instance: ElementInstance;
 };
 
 function parseActionError(message: string): string {
@@ -285,10 +290,15 @@ export function usePlayerRuntime(participantId: string) {
         visibleReserveOfferIds: runtime?.reserveTemplates.map((template) => template.reserveOfferId) ?? [],
       });
 
-      await postJson("/api/elements/activate", {
+      const activation = await postJson<ActivateElementResponse>("/api/elements/activate", {
         participantId,
         reserveOfferId,
       });
+
+      setRuntime((current) => applyActivationRuntimeOptimisticUpdate(current, {
+        reserveOfferId,
+        instance: activation.instance,
+      }));
 
       setSuccessMessage("Élément activé.");
       await loadRuntime(false);
