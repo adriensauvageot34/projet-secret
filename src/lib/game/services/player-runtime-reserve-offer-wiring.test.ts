@@ -41,7 +41,7 @@ test("createReserveActivateClickHandler envoie l'id affiché sur la carte", asyn
 
 test("hook joueur envoie reserveOfferId vers l'API d'activation", () => {
   const hook = readFileSync("src/hooks/use-player-runtime.ts", "utf8");
-  const activationCallMatch = hook.match(/await postJson\("\/api\/elements\/activate", \{[\s\S]*?\}\);/);
+  const activationCallMatch = hook.match(/postJson(?:<[^>]+>)?\("\/api\/elements\/activate", \{[\s\S]*?\}\);/);
 
   assert.ok(activationCallMatch, "activation call block should exist");
   const activationCallBlock = activationCallMatch[0];

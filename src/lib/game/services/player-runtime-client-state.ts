@@ -7,6 +7,27 @@ type RuntimeLike = {
   }>;
 };
 
+type RuntimeWithReserve = RuntimeLike & {
+  reserveTemplates: Array<{
+    reserveOfferId: string;
+    templateId: string;
+    name: string;
+    code: string;
+    elementType: string;
+    validationMode: string;
+  }>;
+  activeElements: Array<{
+    instance: ElementInstance;
+    template: {
+      id: string;
+      name: string;
+      code: string;
+      elementType: string;
+      validationMode: string;
+    } | null;
+  }>;
+};
+
 function isTerminalRuntimeElement(instance: RuntimeLike["activeElements"][number]["instance"]): boolean {
   return instance.state !== "active" || instance.final_result !== null;
 }
@@ -51,6 +72,40 @@ export function applyClaimRuntimeOptimisticUpdate<T extends RuntimeLike>(
     .filter((element): element is T["activeElements"][number] => element !== null);
 
   return sanitizeRuntimeActiveElements({ ...runtime, activeElements } as T);
+}
+
+export function applyActivationRuntimeOptimisticUpdate<T extends RuntimeWithReserve>(
+  runtime: T | null,
+  params: { reserveOfferId: string; instance: ElementInstance },
+): T | null {
+  if (!runtime) {
+    return runtime;
+  }
+
+  const activatedReserveTemplate = runtime.reserveTemplates.find((template) => template.reserveOfferId === params.reserveOfferId);
+  const activeElements = [
+    {
+      instance: params.instance,
+      template: activatedReserveTemplate
+        ? {
+            id: activatedReserveTemplate.templateId,
+            name: activatedReserveTemplate.name,
+            code: activatedReserveTemplate.code,
+            elementType: activatedReserveTemplate.elementType,
+            validationMode: activatedReserveTemplate.validationMode,
+          }
+        : null,
+    },
+    ...runtime.activeElements.filter((element) => element.instance.id !== params.instance.id),
+  ];
+
+  const reserveTemplates = runtime.reserveTemplates.filter((template) => template.reserveOfferId !== params.reserveOfferId);
+
+  return applyServerRuntimeSnapshot({
+    ...runtime,
+    activeElements,
+    reserveTemplates,
+  } as T);
 }
 
 export function canClaimRuntimeElement(
