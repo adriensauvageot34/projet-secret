@@ -6565,12 +6565,13 @@ values
   ('Cédric', null, null, null, true, true, false, null),
   ('Juliette', null, null, null, true, true, false, null),
   ('Lou', null, null, null, true, true, false, null),
-  ('Mec de Lou', null, null, null, true, true, false, null),
+  ('Louis', null, null, null, true, true, false, null),
   ('Lucas', null, null, null, true, true, false, null),
   ('Florentine', null, null, null, true, true, false, null),
   ('Marina', null, null, null, true, true, false, null),
   ('Laurinne', null, null, null, true, true, false, null),
   ('Andy', null, null, null, true, true, false, null),
+  ('Alyson', null, null, null, true, true, false, null),
   ('Adrien', null, null, null, true, false, true, null)
 on conflict (display_name) do update
 set
@@ -6798,12 +6799,13 @@ select
     when 'Cédric' then 'cedric-c7m1'
     when 'Juliette' then 'juliette-j4k2'
     when 'Lou' then 'lou-l8p3'
-    when 'Mec de Lou' then 'mec-de-lou-m5s4'
+    when 'Louis' then 'mec-de-lou-m5s4'
     when 'Lucas' then 'lucas-l2x5'
     when 'Florentine' then 'florentine-f9d6'
     when 'Marina' then 'marina-m3h7'
     when 'Laurinne' then 'laurinne-l6q8'
     when 'Andy' then 'andy-a1t9'
+    when 'Alyson' then 'alyson-a2l7'
     when 'Adrien' then 'adrien-z7g4'
     else concat(
       coalesce(

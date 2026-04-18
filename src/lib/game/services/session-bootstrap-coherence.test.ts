@@ -45,6 +45,16 @@ test("session seed bootstrap: Greg and Alexis are excluded from canonical sessio
   assert.match(seed, /where pfs\.include_in_session = true/);
 });
 
+test("session seed bootstrap: canonical roster includes Alyson and Louis display name", () => {
+  const seed = loadFile(seedSqlPath);
+
+  assert.match(seed, /\('Alyson', null, null, null, true, true, false, null\)/);
+  assert.match(seed, /\('Louis', null, null, null, true, true, false, null\)/);
+  assert.match(seed, /when 'Alyson' then 'alyson-a2l7'/);
+  assert.match(seed, /when 'Louis' then 'mec-de-lou-m5s4'/);
+  assert.doesNotMatch(seed, /'Mec de Lou'/);
+});
+
 test("schema guardrails: one GM max per session and role/status coherence", () => {
   const migration = loadFile(migrationPath);
 
