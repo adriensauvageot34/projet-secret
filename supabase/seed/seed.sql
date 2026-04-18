@@ -6722,15 +6722,10 @@ set
       'force_public_hint_reveal',
       'freeze_timer_60s',
       'halve_slot_cooldown',
-      'unlock_slot_now',
       'accelerate_slot_unlock',
       'shorten_own_constraint_timer',
       'reduce_other_mission_timer',
-      'double_other_constraint_timer',
-      'free_skip',
-      'cancel_skip_penalty',
-      'next_correct_accusation_bonus_3',
-      'double_next_mission_value'
+      'double_other_constraint_timer'
     ) then true
     else false
   end,
