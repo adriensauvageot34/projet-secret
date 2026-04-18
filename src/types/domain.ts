@@ -149,7 +149,15 @@ export interface ParticipantReserveOffer {
 export interface ParticipantReserveOfferWithTemplate extends ParticipantReserveOffer {
   template: Pick<
     ElementTemplate,
-    "id" | "name" | "code" | "element_type" | "difficulty" | "duration_seconds" | "validation_mode"
+    | "id"
+    | "name"
+    | "code"
+    | "element_type"
+    | "difficulty"
+    | "duration_seconds"
+    | "validation_mode"
+    | "base_points"
+    | "player_display_text"
   >;
 }
 

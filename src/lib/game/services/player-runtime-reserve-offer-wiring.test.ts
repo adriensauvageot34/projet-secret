@@ -17,7 +17,7 @@ test("reserve panel rend et active les cartes via reserveOfferId exact", () => {
   assert.match(panel, /const displayedReserveOfferId = template\.reserveOfferId/);
   assert.match(panel, /key=\{displayedReserveOfferId\}/);
   assert.match(panel, /data-reserve-offer-id=\{displayedReserveOfferId\}/);
-  assert.match(panel, /offerId: \{displayedReserveOfferId\}/);
+  assert.doesNotMatch(panel, /offerId:/);
   assert.match(panel, /onClick=\{handleActivateClick\}/);
 });
 

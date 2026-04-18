@@ -184,11 +184,10 @@ export async function GET(_request: Request, context: { params: { participantId:
       reserveOfferId: offer.id,
       templateId: offer.template.id,
       name: offer.template.name,
-      code: offer.template.code,
       elementType: offer.template.element_type,
-      difficulty: offer.template.difficulty,
+      basePoints: offer.template.base_points,
       durationSeconds: offer.template.duration_seconds,
-      validationMode: offer.template.validation_mode,
+      description: offer.template.player_display_text,
     }));
 
     console.info("[player-runtime] reserve offers response", {

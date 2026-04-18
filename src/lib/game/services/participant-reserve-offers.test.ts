@@ -393,9 +393,10 @@ test("reserve top-up: plusieurs consommations successives maintiennent 4 visible
       },
       {
         ...commonDeps,
+        listVisibleReserveOffersByParticipant: commonDeps.listVisibleReserveOffersByParticipant as never,
         getLatestRevokedReserveOfferForTemplate: async (_participantId: string, _sessionId: string, templateId: string) =>
           visibleOffers.find((offer) => offer.element_template_id === templateId && offer.revoked_at !== null) ?? null,
-      },
+      } as never,
     );
 
     assert.equal(refillResult.replaced, true);
@@ -424,7 +425,7 @@ test("reserve top-up: stock insuffisant => moins de 4 sans erreur", async () => 
         makeTemplate({ id: "template-b", code: "B" }),
         makeTemplate({ id: "template-c", code: "C" }),
       ],
-      listVisibleReserveOffersByParticipant: async () => visibleOffers.filter((offer) => offer.revoked_at === null),
+      listVisibleReserveOffersByParticipant: async () => visibleOffers.filter((offer) => offer.revoked_at === null) as never,
       listVisibleReserveOffersByParticipantInSession: async () => [],
       listVisibleReserveOffersBySession: async () => visibleOffers.filter((offer) => offer.revoked_at === null),
       createReserveOffer: async (payload) => {

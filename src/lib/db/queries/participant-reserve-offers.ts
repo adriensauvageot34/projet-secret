@@ -22,7 +22,9 @@ export async function listVisibleReserveOffersByParticipant(participantId: strin
         element_type,
         difficulty,
         duration_seconds,
-        validation_mode
+        validation_mode,
+        base_points,
+        player_display_text
       )
     `)
     .eq("participant_id", participantId)
@@ -54,6 +56,8 @@ export async function listVisibleReserveOffersByParticipant(participantId: strin
         difficulty: template.difficulty as number,
         duration_seconds: template.duration_seconds as number,
         validation_mode: template.validation_mode as "auto" | "proof" | "gm",
+        base_points: template.base_points as number,
+        player_display_text: template.player_display_text as string,
       },
     };
   });
@@ -83,7 +87,9 @@ export async function listVisibleReserveOffersByParticipantInSession(
         element_type,
         difficulty,
         duration_seconds,
-        validation_mode
+        validation_mode,
+        base_points,
+        player_display_text
       )
     `)
     .eq("participant_id", participantId)
@@ -116,6 +122,8 @@ export async function listVisibleReserveOffersByParticipantInSession(
         difficulty: template.difficulty as number,
         duration_seconds: template.duration_seconds as number,
         validation_mode: template.validation_mode as "auto" | "proof" | "gm",
+        base_points: template.base_points as number,
+        player_display_text: template.player_display_text as string,
       },
     };
   });

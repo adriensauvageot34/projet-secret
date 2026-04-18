@@ -33,10 +33,10 @@ test("skip countdown: indisponible puis disponible à échéance", () => {
   assert.equal(getSkipRemainingSeconds(skipAvailableAt, now), 90);
   assert.deepEqual(getSkipAvailability(skipAvailableAt, now), {
     canSkipNow: false,
-    label: "Skip dispo dans 01:30",
+    label: "Passer dans 01:30",
   });
   assert.deepEqual(getSkipAvailability(skipAvailableAt, Date.parse("2026-01-01T00:01:30.000Z")), {
     canSkipNow: true,
-    label: "Skip disponible",
+    label: "Passer",
   });
 });
