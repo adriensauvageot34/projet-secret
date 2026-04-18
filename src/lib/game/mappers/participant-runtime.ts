@@ -3,9 +3,7 @@ import type { ElementInstance, ElementTemplate } from "@/types/domain";
 export type PlayerRuntimeTemplateSummary = {
   id: string;
   name: string;
-  code: string;
   elementType: ElementTemplate["element_type"];
-  validationMode: ElementTemplate["validation_mode"];
 };
 
 export type PlayerRuntimeActiveElement = {
@@ -26,9 +24,7 @@ export function mapPlayerActiveElements(
         ? {
             id: template.id,
             name: template.name,
-            code: template.code,
             elementType: template.element_type,
-            validationMode: template.validation_mode,
           }
         : null,
     };

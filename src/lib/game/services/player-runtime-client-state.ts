@@ -12,18 +12,14 @@ type RuntimeWithReserve = RuntimeLike & {
     reserveOfferId: string;
     templateId: string;
     name: string;
-    code: string;
     elementType: string;
-    validationMode: string;
   }>;
   activeElements: Array<{
     instance: ElementInstance;
     template: {
       id: string;
       name: string;
-      code: string;
       elementType: string;
-      validationMode: string;
     } | null;
   }>;
 };
@@ -90,9 +86,7 @@ export function applyActivationRuntimeOptimisticUpdate<T extends RuntimeWithRese
         ? {
             id: activatedReserveTemplate.templateId,
             name: activatedReserveTemplate.name,
-            code: activatedReserveTemplate.code,
             elementType: activatedReserveTemplate.elementType,
-            validationMode: activatedReserveTemplate.validationMode,
           }
         : null,
     },

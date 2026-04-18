@@ -53,17 +53,13 @@ test("activation réussie: runtime local ajoute immédiatement l'élément actif
         reserveOfferId: "offer-1",
         templateId: "template-1",
         name: "Mission Alpha",
-        code: "M_ALPHA",
         elementType: "mission",
-        validationMode: "self_attest",
       },
       {
         reserveOfferId: "offer-2",
         templateId: "template-2",
         name: "Mission Beta",
-        code: "M_BETA",
         elementType: "mission",
-        validationMode: "proof_required",
       },
     ],
     activeElements: [] as Array<{
@@ -71,9 +67,7 @@ test("activation réussie: runtime local ajoute immédiatement l'élément actif
       template: {
         id: string;
         name: string;
-        code: string;
         elementType: string;
-        validationMode: string;
       } | null;
     }>,
   };

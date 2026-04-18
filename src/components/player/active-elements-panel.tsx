@@ -2,7 +2,6 @@ import type { ClaimedResult } from "@/lib/game/enums";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatDate } from "@/utils/formatting";
 import type { PlayerActiveElement } from "@/hooks/use-player-runtime";
 import { canClaimRuntimeElement } from "@/lib/game/services/player-runtime-client-state";
 import { useCountdown } from "@/hooks/use-countdown";
@@ -69,26 +68,14 @@ export function getSkipAvailability(skipAvailableAt: string | null | undefined, 
   const secondsLeft = getSkipRemainingSeconds(skipAvailableAt, nowMs);
 
   if (secondsLeft === null) {
-    return { canSkipNow: false, label: "Skip indisponible" };
+    return { canSkipNow: false, label: "Passer indisponible" };
   }
 
   if (secondsLeft === 0) {
-    return { canSkipNow: true, label: "Skip disponible" };
+    return { canSkipNow: true, label: "Passer" };
   }
 
-  return { canSkipNow: false, label: `Skip dispo dans ${formatMmSs(secondsLeft)}` };
-}
-
-function SkipAvailabilityHint({ skipAvailableAt }: { skipAvailableAt: string | null | undefined }) {
-  const countdownSeconds = useCountdown(skipAvailableAt ?? undefined);
-  const fallback = getSkipAvailability(skipAvailableAt);
-  const status = !skipAvailableAt
-    ? fallback
-    : countdownSeconds === 0
-      ? { canSkipNow: true, label: "Skip disponible" }
-      : { canSkipNow: false, label: `Skip dispo dans ${formatMmSs(countdownSeconds)}` };
-
-  return <span className={status.canSkipNow ? "text-emerald-300" : "text-amber-300"}>{status.label}</span>;
+  return { canSkipNow: false, label: `Passer dans ${formatMmSs(secondsLeft)}` };
 }
 
 function ClaimButton({
@@ -110,8 +97,8 @@ function ClaimButton({
   const skipAvailability = !instance.skip_available_at
     ? getSkipAvailability(instance.skip_available_at)
     : skipSecondsLeft === 0
-      ? { canSkipNow: true, label: "Skip disponible" }
-      : { canSkipNow: false, label: `Skip dispo dans ${formatMmSs(skipSecondsLeft)}` };
+      ? { canSkipNow: true, label: "Passer" }
+      : { canSkipNow: false, label: `Passer dans ${formatMmSs(skipSecondsLeft)}` };
   const isSkipLocked = claim === "skipped" && !skipAvailability.canSkipNow;
   const disabled = !canClaim || isSkipLocked;
 
@@ -152,7 +139,7 @@ export function getClaimButtonLabel(claim: ClaimedResult, elementType: string | 
 export function ActiveElementsPanel({
   activeElements,
   pendingInstanceId,
-  lastClaimFlowByInstanceId,
+  lastClaimFlowByInstanceId: _lastClaimFlowByInstanceId,
   onClaim,
 }: ActiveElementsPanelProps) {
   return (
@@ -163,27 +150,16 @@ export function ActiveElementsPanel({
       ) : (
         <div className="space-y-3">
           {activeElements.map(({ instance, template }) => {
-            const flow = lastClaimFlowByInstanceId[instance.id];
             const canClaim = canClaimRuntimeElement(instance, pendingInstanceId);
             const elementType = template?.elementType;
             const claims = getClaimButtonsForElement(elementType);
 
             return (
               <div key={instance.id} className="rounded border border-slate-700 p-2 text-xs text-slate-300">
-                <p className="text-sm font-medium text-slate-100">{template?.name ?? instance.element_template_id}</p>
-                <p>type: {template?.elementType ?? "-"}</p>
-                <p>state: {instance.state}</p>
-                <p>activeSlotIndex: {instance.active_slot_index ?? "-"}</p>
-                <p>activatedAt: {formatDate(instance.activated_at)}</p>
-                <p>skipAvailableAt: {formatDate(instance.skip_available_at)}</p>
+                <p className="text-sm font-medium text-slate-100">{template?.name ?? "Élément actif"}</p>
                 <p>
-                  skip: <SkipAvailabilityHint skipAvailableAt={instance.skip_available_at} />
+                  Temps restant : <CountdownValue endsAt={instance.ends_at} />
                 </p>
-                <p>endsAt: {formatDate(instance.ends_at)}</p>
-                <p>
-                  countdown: <CountdownValue endsAt={instance.ends_at} />
-                </p>
-                <p>flow: {flow ?? "-"}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {claims.map((claim) => (
                     <ClaimButton

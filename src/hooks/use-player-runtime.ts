@@ -21,9 +21,7 @@ export type PlayerActiveElement = {
   template: {
     id: string;
     name: string;
-    code: string;
     elementType: string;
-    validationMode: string;
   } | null;
 };
 
@@ -31,11 +29,10 @@ export type PlayerReserveTemplate = {
   reserveOfferId: string;
   templateId: string;
   name: string;
-  code: string;
   elementType: string;
-  difficulty: number;
+  basePoints: number;
   durationSeconds: number;
-  validationMode: string;
+  description: string;
 };
 
 export type PlayerShopItem = {
