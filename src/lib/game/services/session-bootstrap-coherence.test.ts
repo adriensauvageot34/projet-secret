@@ -15,7 +15,7 @@ test("session seed bootstrap: participants are initialized with clean runtime co
 
   assert.match(
     seed,
-    /insert into participants \( session_id, player_id, public_slug, current_level_id, display_name, role, current_status, current_score, current_tokens, combo_streak_current, mission_slot_max, constraint_slot_max, completed_elements_count, waiting_slot_count, blocked_slot_count \) select .*? pfs\.current_status, 0, 0, 0, 2, 2, 0, 0, 0 from players_for_session/s,
+    /insert into participants \( session_id, player_id, public_slug, current_level_id, display_name, role, current_status, current_score, current_tokens, combo_streak_current, mission_slot_max, constraint_slot_max, completed_elements_count, waiting_slot_count, blocked_slot_count \) select .*? pfs\.current_status, 0, 1, 0, 2, 2, 0, 0, 0 from players_for_session/s,
   );
 
   assert.match(seed, /on conflict \(session_id, player_id\) do update set .*?current_score = excluded\.current_score,/s);
@@ -24,6 +24,8 @@ test("session seed bootstrap: participants are initialized with clean runtime co
   assert.match(seed, /completed_elements_count = excluded\.completed_elements_count,/);
   assert.match(seed, /waiting_slot_count = excluded\.waiting_slot_count,/);
   assert.match(seed, /blocked_slot_count = excluded\.blocked_slot_count,/);
+  assert.match(seed, /insert into token_events \(/);
+  assert.match(seed, /'level_reward:level_1'/);
 });
 
 test("session seed bootstrap: GM participant is explicit and attached to session", () => {

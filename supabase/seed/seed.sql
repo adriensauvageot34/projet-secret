@@ -6818,7 +6818,7 @@ select
   pfs.role,
   pfs.current_status,
   0,
-  0,
+  1,
   0,
   2,
   2,
@@ -6845,6 +6845,31 @@ set
   waiting_slot_count = excluded.waiting_slot_count,
   blocked_slot_count = excluded.blocked_slot_count,
   updated_at = timezone('utc', now());
+
+insert into token_events (
+  participant_id,
+  session_id,
+  event_type,
+  delta_tokens,
+  notes
+)
+select
+  p.id,
+  p.session_id,
+  'manual_adjustment',
+  1,
+  'level_reward:level_1'
+from participants p
+join sessions s
+  on s.id = p.session_id
+where s.name = 'Jeu des ombres — Anniversaire surprise Manon 27 ans'
+  and not exists (
+    select 1
+    from token_events te
+    where te.participant_id = p.id
+      and te.event_type = 'manual_adjustment'
+      and te.notes = 'level_reward:level_1'
+  );
 
 update sessions s
 set

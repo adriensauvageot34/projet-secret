@@ -15,6 +15,89 @@ function assertNonNegativeResult(value: number, label: string): void {
   }
 }
 
+export function getLevelTokenReward(levelNumber: number): number {
+  if (levelNumber === 1) {
+    return 1;
+  }
+
+  if (levelNumber >= 2 && levelNumber <= 4) {
+    return 2;
+  }
+
+  if (levelNumber === 5) {
+    return 3;
+  }
+
+  return 0;
+}
+
+export function getLevelTokenRewardNote(levelNumber: number): string {
+  return `level_reward:level_${levelNumber}`;
+}
+
+async function hasTokenEventWithNote(participantId: string, note: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("token_events")
+    .select("id")
+    .eq("participant_id", participantId)
+    .eq("event_type", "manual_adjustment")
+    .eq("notes", note)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to check token event note: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+async function loadLevelNumbers(levelIds: string[]): Promise<Map<string, number>> {
+  if (levelIds.length === 0) {
+    return new Map();
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("levels")
+    .select("id, level_number")
+    .in("id", levelIds);
+
+  if (error) {
+    throw new Error(`Failed to load level numbers: ${error.message}`);
+  }
+
+  const map = new Map<string, number>();
+
+  for (const level of (data ?? []) as Array<Pick<Level, "id" | "level_number">>) {
+    map.set(level.id, level.level_number);
+  }
+
+  return map;
+}
+
+function getReachedLevelsForRewards(previousLevelNumber: number | null, nextLevelNumber: number): number[] {
+  const reachedLevels = new Set<number>();
+  reachedLevels.add(1);
+
+  if (previousLevelNumber === null) {
+    for (let level = 2; level <= nextLevelNumber; level += 1) {
+      reachedLevels.add(level);
+    }
+
+    return [...reachedLevels].sort((a, b) => a - b);
+  }
+
+  if (nextLevelNumber > previousLevelNumber) {
+    for (let level = previousLevelNumber + 1; level <= nextLevelNumber; level += 1) {
+      reachedLevels.add(level);
+    }
+  }
+
+  return [...reachedLevels].sort((a, b) => a - b);
+}
+
 export async function addScore(participantId: string, delta: number, reason: string): Promise<number> {
   const supabase = createServerSupabaseClient();
 
@@ -111,7 +194,7 @@ export async function updateParticipantLevel(participantId: string): Promise<str
 
   const { data: participant, error: participantError } = await supabase
     .from("participants")
-    .select("id, current_score")
+    .select("id, session_id, current_score, current_level_id")
     .eq("id", participantId)
     .single();
 
@@ -121,13 +204,53 @@ export async function updateParticipantLevel(participantId: string): Promise<str
 
   const levelId = await computeLevelFromScore(participant.current_score);
 
-  const { error: updateError } = await supabase
-    .from("participants")
-    .update({ current_level_id: levelId })
-    .eq("id", participantId);
+  if (levelId !== participant.current_level_id) {
+    const { error: updateError } = await supabase
+      .from("participants")
+      .update({ current_level_id: levelId })
+      .eq("id", participantId);
 
-  if (updateError) {
-    throw new Error(`Failed to update participant level: ${updateError.message}`);
+    if (updateError) {
+      throw new Error(`Failed to update participant level: ${updateError.message}`);
+    }
+  }
+
+  if (!levelId) {
+    return levelId;
+  }
+
+  const levelIdsToLoad = [participant.current_level_id, levelId].filter((value): value is string => Boolean(value));
+  const levelNumbersById = await loadLevelNumbers(levelIdsToLoad);
+  const previousLevelNumber = participant.current_level_id ? (levelNumbersById.get(participant.current_level_id) ?? null) : null;
+  const nextLevelNumber = levelNumbersById.get(levelId);
+
+  if (!nextLevelNumber) {
+    throw new Error(`Target level ${levelId} not found`);
+  }
+
+  const reachedLevels = getReachedLevelsForRewards(previousLevelNumber, nextLevelNumber);
+
+  for (const reachedLevel of reachedLevels) {
+    const reward = getLevelTokenReward(reachedLevel);
+
+    if (reward <= 0) {
+      continue;
+    }
+
+    const note = getLevelTokenRewardNote(reachedLevel);
+    const alreadyGranted = await hasTokenEventWithNote(participant.id, note);
+
+    if (alreadyGranted) {
+      continue;
+    }
+
+    await createTokenEvent({
+      participantId: participant.id,
+      sessionId: participant.session_id,
+      eventType: "manual_adjustment",
+      deltaTokens: reward,
+      notes: note,
+    });
   }
 
   return levelId;
