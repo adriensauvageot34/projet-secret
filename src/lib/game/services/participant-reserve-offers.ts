@@ -66,6 +66,23 @@ const defaultDependencies: ParticipantReserveOfferDependencies = {
   listSuccessfulElementTemplateIdsForParticipantInSession,
 };
 
+export const PLAYER_VISIBLE_RESERVE_TARGET = 4;
+
+export type ReserveTopUpResult = {
+  participantId: string;
+  sessionId: string;
+  targetVisible: number;
+  visibleBefore: number;
+  visibleAfter: number;
+  offersCreated: number;
+  reason:
+    | "topped_up"
+    | "already_full"
+    | "participant_not_found_or_cross_session"
+    | "level_not_found"
+    | "no_eligible_replacement_template";
+};
+
 export async function listVisibleReserveForParticipant(
   participantId: string,
   sessionId?: string,
@@ -206,6 +223,8 @@ export async function refillVisibleReserveOfferForResolvedElement(
   replacementOfferId: string | null;
   reason:
     | "replaced"
+    | "topped_up"
+    | "already_full"
     | "participant_not_found_or_cross_session"
     | "level_not_found"
     | "no_eligible_replacement_template"
@@ -250,49 +269,170 @@ export async function refillVisibleReserveOfferForResolvedElement(
     && template.id !== input.consumedTemplateId
     && !visibleTemplateIds.has(template.id));
 
-  if (!replacementTemplate) {
-    return {
-      replaced: false,
-      replacementOfferId: null,
-      reason: "no_eligible_replacement_template",
-      debugMessage: "no reserve-eligible replacement template matches current participant constraints",
-    };
-  }
-
   const consumedOffer = await resolvedDependencies.getLatestRevokedReserveOfferForTemplate(
     participant.id,
     input.sessionId,
     input.consumedTemplateId,
   );
+  let primaryRefill: {
+    replaced: boolean;
+    replacementOfferId: string | null;
+    reason: "replaced" | "no_eligible_replacement_template" | "consumed_offer_not_found" | "replacement_failed";
+    debugMessage: string;
+  } = {
+    replaced: false,
+    replacementOfferId: null,
+    reason: replacementTemplate ? "consumed_offer_not_found" : "no_eligible_replacement_template",
+    debugMessage: replacementTemplate
+      ? "no consumed reserve offer found for the resolved template"
+      : "no reserve-eligible replacement template matches current participant constraints",
+  };
 
-  if (!consumedOffer) {
-    return {
-      replaced: false,
-      replacementOfferId: null,
-      reason: "consumed_offer_not_found",
-      debugMessage: "no consumed reserve offer found for the resolved template",
-    };
+  if (replacementTemplate && consumedOffer) {
+    try {
+      const { replacement } = await replaceVisibleReserveOfferWithDependencies({
+        offerId: consumedOffer.id,
+        replacementTemplateId: replacementTemplate.id,
+        replacedAt: input.replacedAt,
+      }, resolvedDependencies);
+
+      primaryRefill = {
+        replaced: true,
+        replacementOfferId: replacement.id,
+        reason: "replaced",
+        debugMessage: "replacement offer created successfully",
+      };
+    } catch (error) {
+      primaryRefill = {
+        replaced: false,
+        replacementOfferId: null,
+        reason: "replacement_failed",
+        debugMessage: error instanceof Error ? error.message : "unknown replacement error",
+      };
+    }
   }
 
-  try {
-    const { replacement } = await replaceVisibleReserveOfferWithDependencies({
-      offerId: consumedOffer.id,
-      replacementTemplateId: replacementTemplate.id,
-      replacedAt: input.replacedAt,
-    }, resolvedDependencies);
+  const topUp = await topUpVisibleReserveOffersForParticipant(
+    {
+      participantId: input.participantId,
+      sessionId: input.sessionId,
+      targetVisible: PLAYER_VISIBLE_RESERVE_TARGET,
+    },
+    resolvedDependencies,
+  );
 
+  if (primaryRefill.replaced) {
+    return primaryRefill;
+  }
+
+  if (topUp.offersCreated > 0 || topUp.reason === "already_full") {
     return {
       replaced: true,
-      replacementOfferId: replacement.id,
-      reason: "replaced",
-      debugMessage: "replacement offer created successfully",
-    };
-  } catch (error) {
-    return {
-      replaced: false,
       replacementOfferId: null,
-      reason: "replacement_failed",
-      debugMessage: error instanceof Error ? error.message : "unknown replacement error",
+      reason: topUp.reason,
+      debugMessage: `reserve topped up to ${topUp.visibleAfter}/${topUp.targetVisible}`,
     };
   }
+
+  return primaryRefill;
+}
+
+export async function topUpVisibleReserveOffersForParticipant(
+  input: { participantId: string; sessionId: string; targetVisible?: number },
+  dependencies: Partial<ParticipantReserveOfferDependencies> = {},
+): Promise<ReserveTopUpResult> {
+  const resolvedDependencies = { ...defaultDependencies, ...dependencies };
+  const targetVisible = input.targetVisible ?? PLAYER_VISIBLE_RESERVE_TARGET;
+  const participant = await resolvedDependencies.getParticipantById(input.participantId);
+
+  if (!participant || participant.session_id !== input.sessionId) {
+    return {
+      participantId: input.participantId,
+      sessionId: input.sessionId,
+      targetVisible,
+      visibleBefore: 0,
+      visibleAfter: 0,
+      offersCreated: 0,
+      reason: "participant_not_found_or_cross_session",
+    };
+  }
+
+  const level = participant.current_level_id
+    ? await resolvedDependencies.getLevelById(participant.current_level_id)
+    : await resolvedDependencies.getLevelByNumber(1);
+
+  if (!level) {
+    return {
+      participantId: participant.id,
+      sessionId: input.sessionId,
+      targetVisible,
+      visibleBefore: 0,
+      visibleAfter: 0,
+      offersCreated: 0,
+      reason: "level_not_found",
+    };
+  }
+
+  const [eligibleTemplates, visibleOffers, successfulTemplateIds] = await Promise.all([
+    resolvedDependencies.getTemplatesForParticipant(level.level_number),
+    resolvedDependencies.listVisibleReserveOffersByParticipant(participant.id),
+    resolvedDependencies.listSuccessfulElementTemplateIdsForParticipantInSession(participant.id, input.sessionId),
+  ]);
+
+  const visibleTemplateIds = new Set(visibleOffers.map((offer) => offer.element_template_id));
+  const successfulTemplateIdSet = new Set(successfulTemplateIds);
+  let visibleCount = visibleOffers.length;
+  const visibleBefore = visibleCount;
+  let offersCreated = 0;
+
+  if (visibleCount >= targetVisible) {
+    return {
+      participantId: participant.id,
+      sessionId: input.sessionId,
+      targetVisible,
+      visibleBefore,
+      visibleAfter: visibleCount,
+      offersCreated,
+      reason: "already_full",
+    };
+  }
+
+  const refillCandidates = eligibleTemplates
+    .filter((template) => template.is_active && template.can_appear_in_reserve)
+    .sort((a, b) => a.code.localeCompare(b.code) || a.id.localeCompare(b.id));
+
+  for (const candidate of refillCandidates) {
+    if (visibleCount >= targetVisible) {
+      break;
+    }
+
+    if (visibleTemplateIds.has(candidate.id) || successfulTemplateIdSet.has(candidate.id)) {
+      continue;
+    }
+
+    try {
+      await createVisibleReserveOffer(
+        {
+          participantId: participant.id,
+          templateId: candidate.id,
+        },
+        resolvedDependencies,
+      );
+      visibleTemplateIds.add(candidate.id);
+      visibleCount += 1;
+      offersCreated += 1;
+    } catch {
+      continue;
+    }
+  }
+
+  return {
+    participantId: participant.id,
+    sessionId: input.sessionId,
+    targetVisible,
+    visibleBefore,
+    visibleAfter: visibleCount,
+    offersCreated,
+    reason: offersCreated > 0 ? "topped_up" : "no_eligible_replacement_template",
+  };
 }

@@ -44,6 +44,6 @@ test("cohérence propagation: player-runtime utilise current_level pour réserve
   const playerRuntimeRoute = readFileSync("src/app/api/player-runtime/[participantId]/route.ts", "utf8");
 
   assert.match(playerRuntimeRoute, /participant\.current_level_id/);
-  assert.match(playerRuntimeRoute, /getTemplatesForParticipant\(level\.level_number\)/);
+  assert.match(playerRuntimeRoute, /topUpVisibleReserveOffersForParticipant\(/);
   assert.match(playerRuntimeRoute, /getVisibleShopTemplatesForLevel\(level\.level_number\)/);
 });
