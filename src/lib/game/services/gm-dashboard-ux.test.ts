@@ -23,6 +23,8 @@ test("vue live GM: structure joueurs puis éléments actifs", () => {
   const live = readFileSync("src/components/gm/gm-live-elements.tsx", "utf8");
 
   assert.match(live, /Joueurs → éléments actifs/);
+  assert.match(live, /participantName: element\.participant_display_name \?\? "Joueur"/);
+  assert.match(live, /element\.template_name \?\? "Élément actif"/);
   assert.match(live, /toElementTypeLabel/);
   assert.match(live, /chrono restant/);
   assert.match(live, /Valider Grillé/);

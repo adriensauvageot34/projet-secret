@@ -59,6 +59,20 @@ test("signal gm_pending: visible uniquement en mode gm après claim et avant fin
   assert.equal(alreadyFinal.is_gm_pending, false);
 });
 
+test("mapping runtime GM: lit correctement les relations PostgREST en objet simple", () => {
+  const mapped = mapGmRuntimeElement(makeRawElementRow({
+    participants: { display_name: "Alice Runtime" },
+    element_templates: { name: "Mission Runtime", element_type: "mission", validation_mode: "gm" },
+    claimed_result: null,
+    proof_status: "not_required",
+  }));
+
+  assert.equal(mapped.participant_display_name, "Alice Runtime");
+  assert.equal(mapped.template_name, "Mission Runtime");
+  assert.equal(mapped.element_type, "mission");
+  assert.equal(mapped.validation_mode, "gm");
+});
+
 test("résumé final GM: exclut le GM, expose winner/podium/bottom5", () => {
   const summary = buildGmFinalSummary([
     {

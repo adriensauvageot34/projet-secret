@@ -88,8 +88,12 @@ type RawElementRuntimeRow = {
   ends_at: string | null;
   claimed_result: string | null;
   final_result: string | null;
-  participants: { display_name: string }[] | null;
+  participants: { display_name: string } | { display_name: string }[] | null;
   element_templates: {
+    name: string;
+    element_type: string;
+    validation_mode: string;
+  } | {
     name: string;
     element_type: string;
     validation_mode: string;
@@ -108,16 +112,18 @@ type RawActiveTicketRow = {
 };
 
 export function mapGmRuntimeElement(row: RawElementRuntimeRow): GmRuntimeElement {
-  const validationMode = row.element_templates?.[0]?.validation_mode ?? null;
+  const participant = Array.isArray(row.participants) ? row.participants[0] : row.participants;
+  const template = Array.isArray(row.element_templates) ? row.element_templates[0] : row.element_templates;
+  const validationMode = template?.validation_mode ?? null;
   const isPendingResolution = row.claimed_result !== null && row.final_result === null;
 
   return {
     id: row.id,
     participant_id: row.participant_id,
-    participant_display_name: row.participants?.[0]?.display_name ?? null,
+    participant_display_name: participant?.display_name ?? null,
     element_template_id: row.element_template_id,
-    template_name: row.element_templates?.[0]?.name ?? null,
-    element_type: row.element_templates?.[0]?.element_type ?? null,
+    template_name: template?.name ?? null,
+    element_type: template?.element_type ?? null,
     validation_mode: validationMode,
     state: row.state,
     proof_status: row.proof_status,
