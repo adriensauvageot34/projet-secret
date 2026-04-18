@@ -30,7 +30,6 @@ export type GmRuntimeElement = {
   validation_mode: string | null;
   state: string;
   proof_status: string;
-  is_fake: boolean;
   is_proof_pending: boolean;
   is_gm_pending: boolean;
   activated_at: string | null;
@@ -85,7 +84,6 @@ type RawElementRuntimeRow = {
   element_template_id: string;
   state: string;
   proof_status: string;
-  is_fake: boolean;
   activated_at: string | null;
   ends_at: string | null;
   claimed_result: string | null;
@@ -123,7 +121,6 @@ export function mapGmRuntimeElement(row: RawElementRuntimeRow): GmRuntimeElement
     validation_mode: validationMode,
     state: row.state,
     proof_status: row.proof_status,
-    is_fake: row.is_fake,
     is_proof_pending: validationMode === "proof" && isPendingResolution && row.proof_status === "pending",
     is_gm_pending: validationMode === "gm" && isPendingResolution && row.state === "active",
     activated_at: row.activated_at,
@@ -158,7 +155,6 @@ async function listSessionLiveElements(sessionId: string): Promise<GmRuntimeElem
       element_template_id,
       state,
       proof_status,
-      is_fake,
       activated_at,
       ends_at,
       claimed_result,
