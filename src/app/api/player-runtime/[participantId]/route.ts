@@ -9,7 +9,7 @@ import { getParticipantAdvantageInventory } from "@/lib/db/queries/advantage-ins
 import { canParticipantBuyAdvantage } from "@/lib/game/rules/advantages";
 import { buildLiveRanking, buildLocalRankingWindow, type RankingParticipant } from "@/lib/game/services/live-ranking";
 import { getSessionById } from "@/lib/db/queries/sessions";
-import { listVisibleReserveForParticipant } from "@/lib/game/services/participant-reserve-offers";
+import { listVisibleReserveForParticipant, topUpVisibleReserveOffersForParticipant } from "@/lib/game/services/participant-reserve-offers";
 import { bootstrapInitialSessionReserves } from "@/lib/game/services/session-reserve-bootstrap";
 import { mapPlayerActiveElements } from "@/lib/game/mappers/participant-runtime";
 import { resolveExpiredElementsForParticipant } from "@/lib/game/services/resolve-expired-elements";
@@ -167,13 +167,18 @@ export async function GET(_request: Request, context: { params: { participantId:
     const activeTemplatesById = new Map(activeElementTemplates.map((template) => [template.id, template]));
     const activeElements = mapPlayerActiveElements(activeInstances, activeTemplatesById);
 
-    if (persistedVisibleReserveOffers.length === 0 && session.status === "live") {
-      await bootstrapInitialSessionReserves(session.id);
+    if (session.status === "live") {
+      if (persistedVisibleReserveOffers.length === 0) {
+        await bootstrapInitialSessionReserves(session.id);
+      }
+
+      await topUpVisibleReserveOffersForParticipant({
+        participantId: participant.id,
+        sessionId: participant.session_id,
+      });
     }
 
-    const visibleReserveOffers = persistedVisibleReserveOffers.length > 0
-      ? persistedVisibleReserveOffers
-      : await listVisibleReserveForParticipant(participant.id, participant.session_id);
+    const visibleReserveOffers = await listVisibleReserveForParticipant(participant.id, participant.session_id);
 
     const reserveTemplates = visibleReserveOffers.map((offer) => ({
       reserveOfferId: offer.id,
