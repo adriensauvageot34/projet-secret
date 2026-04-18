@@ -156,6 +156,47 @@ export function useGmRuntime() {
     );
   }, [runAction, runtime]);
 
+
+
+  const markElementCaught = useCallback(async (params: {
+    element: GmRuntimeData["liveElements"][number];
+    accuserParticipantId: string;
+  }) => {
+    if (!runtime?.session.session_gm_participant_id) {
+      setActionError("Aucun participant GM configuré dans la session courante.");
+      return;
+    }
+
+    await runAction(
+      `caught-${params.element.id}`,
+      async () => {
+        if (params.element.element_type !== "mission" && params.element.element_type !== "constraint") {
+          throw new Error("Type d'élément actif invalide pour une action grillé.");
+        }
+
+        const accusation = await postJson<{ id: string }>("/api/accusations/create", {
+          sessionId: runtime.session.id,
+          accuserParticipantId: params.accuserParticipantId,
+          accusedParticipantId: params.element.participant_id,
+          suspectedType: params.element.element_type,
+          suspectedTemplateId: params.element.element_template_id,
+          relatedElementInstanceId: params.element.id,
+          justification: "Signalement GM: joueur grillé en situation réelle",
+        });
+
+        await postJson("/api/accusations/adjudicate", {
+          accusationId: accusation.id,
+          sessionId: runtime.session.id,
+          adjudicatedByParticipantId: runtime.session.session_gm_participant_id,
+          decision: "correct",
+          rewardTokens: 1,
+          notesAdmin: "Action rapide GM: grillé",
+        });
+      },
+      "Joueur marqué comme grillé.",
+    );
+  }, [runAction, runtime]);
+
   const createDecision = useCallback(async (params: {
     decisionType: GmDecisionType;
     decisionLabel: string;
@@ -236,6 +277,7 @@ export function useGmRuntime() {
     refresh: () => loadRuntime(false),
     createAccusation,
     adjudicateAccusation,
+    markElementCaught,
     createDecision,
     applyDecision,
     cancelDecision,
@@ -251,6 +293,7 @@ export function useGmRuntime() {
     loadRuntime,
     createAccusation,
     adjudicateAccusation,
+    markElementCaught,
     createDecision,
     applyDecision,
     cancelDecision,

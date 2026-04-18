@@ -10,7 +10,6 @@ function makeRawElementRow(overrides: Partial<Parameters<typeof mapGmRuntimeElem
     element_template_id: "00000000-0000-0000-0000-000000000003",
     state: "active",
     proof_status: "pending",
-    is_fake: false,
     activated_at: "2026-01-01T00:00:00.000Z",
     ends_at: "2026-01-01T00:10:00.000Z",
     claimed_result: "success",

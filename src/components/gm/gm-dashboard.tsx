@@ -1,24 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useGmRuntime } from "@/hooks/use-gm-runtime";
 import { GmSessionHeader } from "@/components/gm/gm-session-header";
 import { GmParticipantList } from "@/components/gm/gm-participant-list";
 import { GmLiveElements } from "@/components/gm/gm-live-elements";
-import { GmAccusationsQueue } from "@/components/gm/gm-accusations-queue";
-import { GmDecisionsPanel } from "@/components/gm/gm-decisions-panel";
 import { GmScoreboard } from "@/components/gm/gm-scoreboard";
 import { GmActiveTicketQueue } from "@/components/gm/gm-active-ticket-queue";
 
 export function GmDashboard() {
   const gm = useGmRuntime();
-
-  const participantOptions = useMemo(
-    () => gm.runtime?.participants.map((p) => ({ id: p.id, label: p.display_name })) ?? [],
-    [gm.runtime?.participants],
-  );
 
   if (gm.isLoading && !gm.runtime) {
     return <Card className="text-sm text-slate-300">Chargement du runtime GM…</Card>;
@@ -49,30 +41,15 @@ export function GmDashboard() {
       />
       <GmParticipantList participants={gm.runtime.participants} />
       <GmActiveTicketQueue tickets={gm.runtime.activeGmTickets} />
-      <GmLiveElements liveElements={gm.runtime.liveElements} />
+      <GmLiveElements
+        liveElements={gm.runtime.liveElements}
+        participants={gm.runtime.participants}
+        pendingActionKey={gm.pendingActionKey}
+        onMarkCaught={gm.markElementCaught}
+      />
       {gm.runtime.session.status === "finished" ? (
         <Card className="text-xs text-slate-300">Session terminée: actions GM gameplay verrouillées.</Card>
-      ) : (
-        <>
-          <GmAccusationsQueue
-            accusations={gm.runtime.accusations}
-            participantOptions={participantOptions}
-            liveElements={gm.runtime.liveElements}
-            pendingActionKey={gm.pendingActionKey}
-            onCreate={gm.createAccusation}
-            onAdjudicate={gm.adjudicateAccusation}
-          />
-          <GmDecisionsPanel
-            decisions={gm.runtime.decisions}
-            participantOptions={participantOptions}
-            accusationOptions={gm.runtime.accusations.map((accusation) => ({ id: accusation.id, label: accusation.justification }))}
-            pendingActionKey={gm.pendingActionKey}
-            onCreate={gm.createDecision}
-            onApply={gm.applyDecision}
-            onCancel={gm.cancelDecision}
-          />
-        </>
-      )}
+      ) : null}
       <GmScoreboard
         participants={gm.runtime.participants}
         sessionStatus={gm.runtime.session.status}
